@@ -1,7 +1,6 @@
 """Home: mandate, how to use the app, real data coverage and roadmap."""
 
 from __future__ import annotations
-
 import plotly.graph_objects as go
 import streamlit as st
 
