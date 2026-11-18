@@ -1,13 +1,16 @@
-"""Investor screening of the equity universe: region, sector and ESG level.
+"""ESG in the equity universe: investor screening and ESG risk budgets.
 
-This drives the website questionnaire: the investor picks region(s), ICB
-industry(ies) and how ESG-friendly the portfolio should be.
+Two separate uses of the ESG scores:
 
-Regions are the six investor zones of ``core.config.ZONES``:
-``US``, ``Europe``, ``Asia``, ``Oceania``, ``Middle East & Africa``,
-``Emerging Europe``. Source-index keys are accepted too and expand to their
-zones (``"Pacific"`` -> Asia + Oceania, ``"EM EMEA"`` -> Middle East & Africa +
-Emerging Europe, ``"Eurozone"`` -> Europe).
+1. Screening (website questionnaire): the investor picks region(s), ICB
+   industry(ies) and how ESG-friendly the universe should be
+   (:func:`screen_universe`, :func:`investor_selection`).
+2. ESG risk budgeting (the ESG portfolio): risk budgets proportional to the
+   ESG scores, ``b_i = score_i / sum(scores)`` (:func:`esg_risk_budgets`),
+   passed to the risk-budgeting optimiser instead of the ERC budgets 1/N.
+
+Regions are the four equity sleeves of ``core.config.ZONES``:
+``US``, ``Eurozone``, ``Pacific``, ``EM EMEA`` (one per source index).
 
 The stock table expected here is ``data/processed/esg_universe.parquet`` (or
 ``load_all()["esg"]``): indexed by ``"<zone>|<name>"`` with at least
@@ -22,7 +25,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from core.config import ASSET_ID_SEP, EQUITY_ASSET_CLASS, ICB_INDUSTRIES, REGIONS, ZONES
+from core.config import ASSET_ID_SEP, EQUITY_ASSET_CLASS, ESG_MISSING, ICB_INDUSTRIES, REGIONS, ZONES
 from core.importation_data import assign_zones, read_esg_universe, read_processed, sort_stock_table
 
 logger = logging.getLogger(__name__)
@@ -310,3 +313,35 @@ def investor_selection(
         out[kind] = pd.concat(frames, axis=1) if frames else pd.DataFrame()
         out[kind].columns.name = "asset_id"
     return out
+
+
+# --------------------------------------------------------------------------- #
+# ESG risk budgets (ESG portfolio)
+# --------------------------------------------------------------------------- #
+def esg_risk_budgets(scores: pd.Series, missing: str = ESG_MISSING) -> pd.Series:
+    """ESG risk budgets ``b_i = score_i / sum(scores)``.
+
+    Parameters
+    ----------
+    scores : ESG scores (e.g. from :func:`esg_scores_vector`), indexed by asset.
+    missing : ``"exclude"`` (default, ``core.config.ESG_MISSING``): stocks
+        without a score are dropped from the ESG portfolio.
+
+    Returns
+    -------
+    pd.Series of budgets summing to 1, on the stocks that have a score.
+    """
+    if missing != "exclude":
+        raise ValueError("only missing='exclude' is supported")
+    s = scores.astype(float).dropna()
+    n_dropped = len(scores) - len(s)
+    if n_dropped:
+        logger.info("ESG budgets: %d stocks without a score excluded", n_dropped)
+    if s.empty:
+        raise ValueError("No stock with an ESG score")
+    if (s <= 0).any():
+        raise ValueError("ESG scores must be strictly positive")
+    budgets = s / s.sum()
+    budgets.name = "risk_budget"
+    return budgets
+

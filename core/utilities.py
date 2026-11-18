@@ -1,17 +1,10 @@
-"""Returns, volatility and (next step) risk budgeting / backtest.
+"""Returns, volatility, risk budgeting (ERC), backtest and performance metrics.
 
-Implemented now
----------------
-- :func:`simple_returns`, :func:`excess_returns` (the pipeline's convention)
-- :func:`log_returns`, :func:`excess_log_returns` (kept for reference)
-- volatility: :func:`rolling_volatility` (1-year rolling, annualised) is the
-  single volatility measure of the project; :func:`volatility_summary`
-- eligibility: :func:`window_coverage`, :func:`eligible_assets`
-
-Stubs for the next step (raise ``NotImplementedError``)
--------------------------------------------------------
-:func:`covariance_matrix`, :func:`risk_contributions`, :func:`erc_weights`,
-:func:`risk_budget_weights`, :func:`backtest`, :func:`performance_metrics`.
+- returns:        simple_returns, excess_returns, rolling_volatility
+- risk budgeting: covariance_matrix, risk_contributions, risk_budget_weights,
+                  erc_weights, two_level_weights
+- backtest:       rebalancing_dates, eligible_assets, backtest
+- metrics:        drawdown, performance_metrics, period_performance
 """
 
 from __future__ import annotations
@@ -20,310 +13,220 @@ import logging
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
+from sklearn.covariance import LedoitWolf
 
-from core.config import ESTIMATION_WINDOW, MIN_WINDOW_COVERAGE, PERIODS_PER_YEAR
+from core.config import ESTIMATION_WINDOW, REBALANCING_FREQ, TRADING_DAYS
 
 logger = logging.getLogger(__name__)
 
-FrameOrSeries = pd.DataFrame | pd.Series
-
-_RESAMPLE_RULE = {"W": "W-FRI", "M": "ME"}
-
 
 # --------------------------------------------------------------------------- #
-# Helpers
+# Returns and volatility
 # --------------------------------------------------------------------------- #
-def infer_periods_per_year(index: pd.DatetimeIndex) -> int:
-    """Guess the annualisation factor (252 / 52 / 12) from the median date spacing."""
-    if len(index) < 3:
-        return PERIODS_PER_YEAR["D"]
-    spacing = pd.Series(index).diff().dt.days.median()
-    if spacing <= 4:
-        return PERIODS_PER_YEAR["D"]
-    if spacing <= 10:
-        return PERIODS_PER_YEAR["W"]
-    return PERIODS_PER_YEAR["M"]
+def simple_returns(prices: pd.DataFrame | pd.Series, freq: str = "D") -> pd.DataFrame | pd.Series:
+    """Simple returns ``R_t = P_t / P_{t-1} - 1`` (daily ``"D"`` or month-end ``"M"``).
 
-
-def _as_frame(x: FrameOrSeries) -> tuple[pd.DataFrame, bool]:
-    if isinstance(x, pd.Series):
-        return x.to_frame(), True
-    return x, False
-
-
-def _restore(df: pd.DataFrame, was_series: bool, name=None) -> FrameOrSeries:
-    if was_series:
-        s = df.iloc[:, 0]
-        s.name = name
-        return s
-    return df
-
-
-# --------------------------------------------------------------------------- #
-# Returns
-# --------------------------------------------------------------------------- #
-def _period_prices(prices: FrameOrSeries, freq: str) -> FrameOrSeries:
-    """Prices sampled at ``freq`` (period-end ``last`` for W/M), non-positive -> NaN."""
-    if freq not in {"D", "W", "M"}:
-        raise ValueError("freq must be one of 'D', 'W', 'M'")
-    p = prices.astype(float)
-    if freq != "D":
-        p = p.resample(_RESAMPLE_RULE[freq]).last()
-    return p.where(p > 0)
-
-
-def _winsorize(r: FrameOrSeries, q: float | None) -> FrameOrSeries:
-    if q is None:
-        return r
-    if not 0 < q < 0.5:
-        raise ValueError("winsorize must be in (0, 0.5)")
-    lo, hi = r.quantile(q), r.quantile(1 - q)
-    return r.clip(lower=lo, upper=hi, axis=1 if isinstance(r, pd.DataFrame) else None)
-
-
-def simple_returns(
-    prices: FrameOrSeries, freq: str = "D", winsorize: float | None = None
-) -> FrameOrSeries:
-    """Simple (arithmetic) returns from price levels: ``prices.pct_change()``,
-    i.e. ``R_t = P_t / P_{t-1} - 1``.
-
-    All equity, bond, commodity and benchmark files are levels (total return
-    indices), so this is the return convention used for every asset class.
-
-    Parameters
-    ----------
-    prices : prices / total-return indices (dates x assets, or a Series).
-    freq : ``"D"`` (as given), ``"W"`` (Friday week-end) or ``"M"`` (month-end).
-        For W/M, prices are first resampled to the period end with ``last``,
-        so the period return compounds the daily returns of the period.
-    winsorize : if given (e.g. ``0.001``), clip each asset's returns at its
-        ``[q, 1-q]`` quantiles. Default ``None``.
-
-    Notes
-    -----
-    A NaN price makes both the return into it and the return out of it NaN:
-    no return is ever computed across a gap. ``fill_method=None`` is passed
-    explicitly because pandas 2.x would otherwise forward-fill the gap first.
+    No return is computed across a missing price (``fill_method=None``).
     """
-    p = _period_prices(prices, freq)
-    r = p.pct_change(fill_method=None)
-    return _winsorize(r, winsorize)
+    if freq == "M":
+        prices = prices.resample("ME").last()
+    return prices.pct_change(fill_method=None)
 
 
-def log_returns(
-    prices: FrameOrSeries, freq: str = "D", winsorize: float | None = None
-) -> FrameOrSeries:
-    """Log returns ``r_t = ln(P_t / P_{t-1})`` (kept for reference / tests).
-
-    The pipeline uses :func:`simple_returns`; ``log(1 + R) = r``.
-
-    Parameters
-    ----------
-    prices : prices / total-return indices (dates x assets, or a Series).
-    freq : ``"D"`` (as given), ``"W"`` (Friday week-end) or ``"M"`` (month-end).
-        For W/M, prices are first resampled to the period end with ``last``
-        (the last available price of the period), then log-differenced.
-    winsorize : if given (e.g. ``0.001``), clip each asset's returns at its
-        ``[q, 1-q]`` quantiles. Default ``None`` (no clipping).
-
-    Notes
-    -----
-    A NaN price makes both the return into it and the return out of it NaN:
-    no return is ever computed across a gap.
-    """
-    p = _period_prices(prices, freq)
-    r = np.log(p).diff()  # NaN on either side -> NaN, never a jump across the gap
-    return _winsorize(r, winsorize)
+def excess_returns(returns: pd.DataFrame | pd.Series, rf_daily: pd.Series) -> pd.DataFrame | pd.Series:
+    """Daily excess returns ``R_t - rf_t``."""
+    rf = rf_daily.reindex(returns.index).fillna(0.0)
+    return returns.sub(rf, axis=0) if isinstance(returns, pd.DataFrame) else returns - rf
 
 
-def _log_rf_per_period(rf: pd.Series, index: pd.DatetimeIndex) -> pd.Series:
-    """Log risk-free return accrued between consecutive dates of ``index``.
-
-    ``rf`` is the *simple daily* rate (``rf_daily``). The rate known at the
-    start of each day is used (``rf_{t-1}``) and compounded over each period,
-    so daily, weekly and monthly return indices all work. First row is NaN.
-    """
-    log_rf = np.log1p(rf.astype(float)).shift(1).fillna(0.0)
-    cum = log_rf.cumsum()
-    cum = cum.reindex(cum.index.union(index)).ffill().fillna(0.0)
-    return cum.reindex(index).diff()
-
-
-def excess_returns(returns: FrameOrSeries, rf: pd.Series) -> FrameOrSeries:
-    """Simple excess returns ``R_t - Rf_t``, with ``Rf_t`` the compounded
-    risk-free return over the same period (see :func:`_log_rf_per_period`)."""
-    rf_period = np.expm1(_log_rf_per_period(rf, returns.index))
-    if isinstance(returns, pd.DataFrame):
-        return returns.sub(rf_period, axis=0)
-    return returns - rf_period
-
-
-def excess_log_returns(returns: FrameOrSeries, rf: pd.Series) -> FrameOrSeries:
-    """Log excess returns ``r_t - ln(1 + Rf_t)`` (for log returns)."""
-    rf_period = _log_rf_per_period(rf, returns.index)
-    if isinstance(returns, pd.DataFrame):
-        return returns.sub(rf_period, axis=0)
-    return returns - rf_period
+def rolling_volatility(returns: pd.DataFrame | pd.Series, window: int = ESTIMATION_WINDOW):
+    """Annualised 1-year rolling volatility ``std(R) * sqrt(252)`` (same window as the ERC)."""
+    return returns.rolling(window, min_periods=window // 2).std() * np.sqrt(TRADING_DAYS)
 
 
 # --------------------------------------------------------------------------- #
-# Volatility (one measure for the whole project)
+# Risk budgeting (LN5)
 # --------------------------------------------------------------------------- #
-VOL_MIN_PERIODS = ESTIMATION_WINDOW // 2  # 126 days: first value after ~6 months of data
+LEDOIT_WOLF_MIN_ASSETS = 30  # Ledoit-Wolf shrinkage for sleeves with at least 30 assets
 
 
-def rolling_volatility(
-    returns: FrameOrSeries,
-    window: int = ESTIMATION_WINDOW,
-    min_periods: int = VOL_MIN_PERIODS,
-    periods_per_year: int | None = None,
-) -> FrameOrSeries:
-    """Annualised 1-year rolling volatility: THE volatility used in the project.
+def covariance_matrix(returns: pd.DataFrame) -> pd.DataFrame:
+    """Annualised covariance of the estimation-window returns (no NaN allowed).
 
-    ``sigma_t = std(R_{t-window+1..t}) * sqrt(252)`` on daily simple returns,
-    with a 252-day window (at least 126 observations). The window is the same
-    as the 1-year estimation window of the ERC / backtest, so this volatility
-    is the square root of the diagonal of the covariance matrix used to build
-    the portfolio. The value on date ``t`` uses returns up to ``t`` included.
+    Sample covariance, or Ledoit-Wolf shrinkage when the sleeve has many stocks
+    (hundreds of stocks for 252 days: the sample covariance is too noisy).
     """
-    ppy = periods_per_year or infer_periods_per_year(returns.index)
-    return returns.rolling(window, min_periods=min_periods).std() * np.sqrt(ppy)
+    x = returns.to_numpy(dtype=float)
+    if x.shape[1] >= LEDOIT_WOLF_MIN_ASSETS:
+        cov = LedoitWolf().fit(x).covariance_
+    else:
+        cov = np.atleast_2d(np.cov(x, rowvar=False))
+    return pd.DataFrame(cov * TRADING_DAYS, index=returns.columns, columns=returns.columns)
 
 
-def _last_valid(df: pd.DataFrame) -> pd.Series:
-    return df.ffill().iloc[-1] if len(df) else pd.Series(np.nan, index=df.columns)
+def risk_contributions(weights: pd.Series, cov: pd.DataFrame, relative: bool = True) -> pd.Series:
+    """Risk contributions ``RC_i = w_i (Sigma w)_i / sigma_p`` (relative: divided by sigma_p, sum = 1)."""
+    w, s = weights.to_numpy(), cov.to_numpy()
+    vol = np.sqrt(w @ s @ w)
+    rc = w * (s @ w) / vol
+    return pd.Series(rc / vol if relative else rc, index=weights.index)
 
 
-def volatility_summary(
-    returns: pd.DataFrame,
-    volatility: pd.DataFrame | None = None,
-    periods_per_year: int | None = None,
-) -> pd.DataFrame:
-    """One row per asset with the volatility statistics (annualised).
+def risk_budget_weights(cov: pd.DataFrame, budgets: pd.Series | None = None) -> pd.Series:
+    """Long-only weights summing to 1 with relative risk contributions = budgets.
 
-    Columns: ``full_sample_vol`` (std of all daily returns in the file),
-    ``vol_latest`` (last value of the 1-year rolling volatility),
-    ``vol_mean``, ``vol_median``, ``vol_min``, ``vol_max`` (of the rolling
-    volatility), ``n_obs``, ``first_valid``, ``last_valid``.
+    Same problem as in LN5, ``min 1/2 y' Sigma y`` s.t. ``sum b_i ln y_i >= c``
+    then ``w = y / sum(y)``, solved in its equivalent form
+    ``min 1/2 y' Sigma y - sum b_i ln y_i`` (fast for hundreds of stocks).
+    ``budgets=None`` gives the ERC portfolio (``b_i = 1/N``).
     """
-    df, _ = _as_frame(returns)
-    ppy = periods_per_year or infer_periods_per_year(df.index)
-    vol = rolling_volatility(df, periods_per_year=ppy) if volatility is None else volatility
-    vol, _ = _as_frame(vol)
-    out = pd.DataFrame(
-        {
-            "full_sample_vol": df.std() * np.sqrt(ppy),
-            "vol_latest": _last_valid(vol),
-            "vol_mean": vol.mean(),
-            "vol_median": vol.median(),
-            "vol_min": vol.min(),
-            "vol_max": vol.max(),
-            "n_obs": df.count().astype(int),
-            "first_valid": [df[c].first_valid_index() for c in df.columns],
-            "last_valid": [df[c].last_valid_index() for c in df.columns],
-        }
+    n = len(cov)
+    if n == 1:
+        return pd.Series(1.0, index=cov.index)
+    b = np.full(n, 1 / n) if budgets is None else budgets.reindex(cov.index).to_numpy(dtype=float)
+    s = cov.to_numpy() / np.mean(np.diag(cov))  # rescaled for numerical stability
+    res = minimize(
+        lambda y: 0.5 * y @ s @ y - b @ np.log(y),
+        x0=b / np.sqrt(np.diag(s)),
+        jac=lambda y: s @ y - b / y,
+        method="L-BFGS-B",
+        bounds=[(1e-12, None)] * n,
+        options={"maxiter": 10_000, "ftol": 1e-15, "gtol": 1e-10},
     )
-    out.index.name = "series"
+    return pd.Series(res.x / res.x.sum(), index=cov.index)
+
+
+def erc_weights(cov: pd.DataFrame) -> pd.Series:
+    """Equal Risk Contribution weights (``b_i = 1/N``)."""
+    return risk_budget_weights(cov)
+
+
+def two_level_weights(
+    window: pd.DataFrame, sleeves: dict[str, list[str]], esg_budgets: dict[str, pd.Series] | None = None
+) -> pd.Series:
+    """Two-level ERC on one estimation window.
+
+    1. Within each sleeve: ERC weights (or ESG risk budgets for the equity
+       sleeves; stocks without a budget are left out).
+    2. Across sleeves: ERC on the sleeve returns (window returns x sleeve weights).
+    3. Weight of an asset = sleeve weight x weight within the sleeve.
+    """
+    inner = {}
+    for sleeve, cols in sleeves.items():
+        cols = [c for c in cols if c in window.columns]
+        budgets = None
+        if esg_budgets and sleeve in esg_budgets:
+            budgets = esg_budgets[sleeve].reindex(cols).dropna()
+            cols = list(budgets.index)
+            budgets = budgets / budgets.sum()
+        if cols:
+            inner[sleeve] = risk_budget_weights(covariance_matrix(window[cols]), budgets)
+    sleeve_returns = pd.DataFrame({s: window[w.index] @ w for s, w in inner.items()})
+    outer = erc_weights(covariance_matrix(sleeve_returns))
+    weights = pd.concat([outer[s] * w for s, w in inner.items()])
+    weights.attrs["sleeve_weights"] = outer
+    return weights
+
+
+# --------------------------------------------------------------------------- #
+# Backtest
+# --------------------------------------------------------------------------- #
+def rebalancing_dates(index: pd.DatetimeIndex, start, freq: str = REBALANCING_FREQ) -> pd.DatetimeIndex:
+    """Last trading day of each month (``"M"``) or quarter (``"Q"``), from the
+    last trading day before ``start``. Weights computed on day t are held from t+1."""
+    days = pd.Series(index, index=index)
+    ends = days.groupby(pd.Grouper(freq={"M": "ME", "Q": "QE"}[freq])).last().dropna()
+    first = days[days < pd.Timestamp(start)].iloc[-1]
+    return pd.DatetimeIndex([first, *ends[ends >= pd.Timestamp(start)]], name="date")
+
+
+def eligible_assets(returns: pd.DataFrame, as_of, window: int = ESTIMATION_WINDOW) -> pd.Series:
+    """True for assets with a return on every one of the last ``window`` days up to ``as_of``."""
+    past = returns.loc[:as_of].tail(window)
+    return past.notna().all() & (len(past) == window)
+
+
+def backtest(returns: pd.DataFrame, weight_fn, start, rebalance: str = REBALANCING_FREQ) -> dict:
+    """Backtest with monthly rebalancing and weights drifting between rebalancings.
+
+    At each rebalancing date t: estimation window = last 252 days up to t,
+    eligible assets = complete window, weights = ``weight_fn(window)``.
+    The weights are held from t+1 (no look-ahead). A missing return during the
+    holding period (e.g. a delisting) counts as 0.
+
+    Returns ``returns`` (daily portfolio returns), ``weights`` (at each
+    rebalancing), ``sleeve_weights`` (if provided by ``weight_fn``), ``turnover``.
+    """
+    dates = rebalancing_dates(returns.index, start, rebalance)
+    weights, sleeve_weights, turnover = {}, {}, {}
+    port = pd.Series(np.nan, index=returns.index, name="portfolio")
+    current = pd.Series(dtype=float)
+
+    for k, t in enumerate(dates):
+        window = returns.loc[:t].tail(ESTIMATION_WINDOW)
+        window = window.loc[:, eligible_assets(returns, t)]
+        w = weight_fn(window)
+        weights[t] = w
+        if "sleeve_weights" in w.attrs:
+            sleeve_weights[t] = w.attrs["sleeve_weights"]
+        turnover[t] = 0.5 * w.sub(current, fill_value=0).abs().sum() if len(current) else 1.0
+
+        end = dates[k + 1] if k + 1 < len(dates) else returns.index[-1]
+        hold = returns.loc[(returns.index > t) & (returns.index <= end), w.index].fillna(0.0)
+        wt = w.to_numpy()
+        for day, r in zip(hold.index, hold.to_numpy()):
+            rp = wt @ r
+            port[day] = rp
+            wt = wt * (1 + r) / (1 + rp)  # weights drift with returns
+        current = pd.Series(wt, index=w.index)
+
+    out = {
+        "returns": port.dropna(),
+        "weights": pd.DataFrame(weights).T.fillna(0.0),
+        "turnover": pd.Series(turnover, name="turnover"),
+    }
+    if sleeve_weights:
+        out["sleeve_weights"] = pd.DataFrame(sleeve_weights).T
     return out
 
 
-def window_coverage(
-    returns: pd.DataFrame, as_of: str | pd.Timestamp, window: int = ESTIMATION_WINDOW
-) -> pd.Series:
-    """Share of the ``window`` business days strictly before ``as_of`` on which
-    each asset has a valid return (1.0 = complete estimation window)."""
-    as_of = pd.Timestamp(as_of)
-    past = returns.loc[returns.index < as_of].tail(window)
-    if len(past) < window:
-        logger.warning("Only %d return dates before %s (window = %d)", len(past), as_of.date(), window)
-    return past.count() / window
-
-
-def eligible_assets(
-    returns: pd.DataFrame,
-    as_of: str | pd.Timestamp,
-    window: int = ESTIMATION_WINDOW,
-    min_coverage: float = MIN_WINDOW_COVERAGE,
-) -> pd.Series:
-    """Boolean flag per asset: enough history in the estimation window before
-    ``as_of`` (coverage >= ``min_coverage``) *and* a valid price on the last
-    date before ``as_of`` (excludes series that stopped, e.g. stale tails).
-
-    Used for the universe at the portfolio start and, later, at every
-    rebalancing date of the backtest.
-    """
-    as_of = pd.Timestamp(as_of)
-    cov = window_coverage(returns, as_of, window)
-    past = returns.loc[returns.index < as_of]
-    alive = past.iloc[-1].notna() if len(past) else pd.Series(False, index=returns.columns)
-    return (cov >= min_coverage) & alive
-
-
 # --------------------------------------------------------------------------- #
-# Next step: risk budgeting, backtest, performance (NOT IMPLEMENTED YET)
+# Performance and risk metrics
 # --------------------------------------------------------------------------- #
-def covariance_matrix(returns: pd.DataFrame, method: str = "sample", **kwargs) -> pd.DataFrame:
-    """Annualised covariance matrix of returns over an estimation window.
-
-    To implement: sample covariance (1-year rolling window in the backtest),
-    optionally EWMA or shrinkage (Ledoit-Wolf); handle assets with missing data
-    in the window (drop or pairwise).
-    """
-    raise NotImplementedError("covariance_matrix: next step (ERC)")
+CRISIS_PERIODS: dict[str, tuple[str, str]] = {
+    "Global Financial Crisis": ("2007-10-09", "2009-03-09"),
+    "Covid crash": ("2020-02-19", "2020-03-23"),
+    "2022 inflation shock": ("2022-01-03", "2022-10-12"),
+}
 
 
-def risk_contributions(weights: pd.Series | np.ndarray, cov: pd.DataFrame | np.ndarray) -> pd.Series:
-    """Risk contributions ``RC_i = w_i (Sigma w)_i / sqrt(w' Sigma w)``.
-
-    To implement: return absolute contributions (summing to portfolio
-    volatility) and/or relative contributions (summing to 1).
-    """
-    raise NotImplementedError("risk_contributions: next step (ERC)")
+def drawdown(returns: pd.Series) -> pd.Series:
+    """Drawdown ``W_t / max(W) - 1`` of the wealth index."""
+    wealth = (1 + returns.fillna(0)).cumprod()
+    return wealth / wealth.cummax() - 1
 
 
-def erc_weights(cov: pd.DataFrame | np.ndarray, **kwargs) -> pd.Series:
-    """Equal Risk Contribution weights (long-only, fully invested).
-
-    To implement: special case of :func:`risk_budget_weights` with equal
-    budgets ``b_i = 1/N``.
-    """
-    raise NotImplementedError("erc_weights: next step (ERC)")
-
-
-def risk_budget_weights(
-    cov: pd.DataFrame | np.ndarray, budgets: pd.Series | np.ndarray, **kwargs
-) -> pd.Series:
-    """Risk-budgeting weights such that ``RC_i / sigma_p = b_i``.
-
-    To implement: e.g. minimise ``sqrt(w' Sigma w) - sum_i b_i ln w_i`` then
-    normalise (Roncalli), with ``scipy.optimize``. ESG budgets come from
-    :func:`core.esg.esg_scores_vector`.
-    """
-    raise NotImplementedError("risk_budget_weights: next step (ESG risk budgeting)")
+def performance_metrics(returns: pd.Series, rf_daily: pd.Series | None = None) -> pd.Series:
+    """Annualised return and volatility, Sharpe ratio, max drawdown, and
+    historical daily VaR / Expected Shortfall at 95% and 99% (positive = loss)."""
+    r = returns.dropna()
+    rf = 0.0 if rf_daily is None else rf_daily.reindex(r.index).fillna(0.0)
+    vol = r.std() * np.sqrt(TRADING_DAYS)
+    out = {
+        "ann_return": (1 + r).prod() ** (TRADING_DAYS / len(r)) - 1,
+        "ann_volatility": vol,
+        "sharpe": (r - rf).mean() * TRADING_DAYS / vol,
+        "max_drawdown": drawdown(r).min(),
+    }
+    for level in (95, 99):
+        var = -r.quantile(1 - level / 100)
+        out[f"VaR_{level}"] = var
+        out[f"ES_{level}"] = -r[r <= -var].mean()
+    return pd.Series(out, name=returns.name)
 
 
-def backtest(
-    returns: pd.DataFrame,
-    weight_fn,
-    rebalance: str = "M",
-    window: int = 252,
-    **kwargs,
-) -> dict:
-    """Rolling backtest: monthly rebalancing, 1-year estimation window.
-
-    To implement: at each rebalancing date estimate the covariance on the past
-    ``window`` days, compute weights with ``weight_fn``, hold (drifting) until
-    the next rebalancing; return weights history and portfolio returns.
-    """
-    raise NotImplementedError("backtest: next step")
-
-
-def performance_metrics(
-    portfolio_returns: pd.Series, benchmark_returns: pd.Series | None = None, rf: pd.Series | None = None
-) -> pd.Series:
-    """Performance and risk metrics vs a benchmark.
-
-    To implement: annualised return / vol, Sharpe, max drawdown, VaR / ES,
-    tracking error, information ratio, beta, turnover.
-    """
-    raise NotImplementedError("performance_metrics: next step")
+def period_performance(returns: pd.DataFrame | pd.Series, periods=CRISIS_PERIODS) -> pd.DataFrame:
+    """Cumulative return of each series over each period (crises)."""
+    df = returns.to_frame() if isinstance(returns, pd.Series) else returns
+    return pd.DataFrame({name: (1 + df.loc[a:b].fillna(0)).prod() - 1 for name, (a, b) in periods.items()}).T
