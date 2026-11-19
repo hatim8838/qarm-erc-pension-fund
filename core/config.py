@@ -128,3 +128,6 @@ ESG_PORTFOLIO_START: str = PORTFOLIO_START  # same period as ERC, for a direct c
 ESG_MISSING: str = "exclude"                # stocks without an ESG score are excluded
 
 TRADING_DAYS: int = 252               # annualisation factor for daily returns
+
+# Debugging for "Investor Preferences"
+MIN_WINDOW_COVERAGE: float = 1.0
