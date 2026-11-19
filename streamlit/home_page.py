@@ -28,12 +28,9 @@ from web_util import (
     style_figure,
 )
 
-page_header(
-    APP_NAME,
-    "Multi-asset portfolio construction for a pension fund with Equal Risk Contributions (ERC) "
-    "and ESG-based risk budgeting.",
-    eyebrow="HEC Lausanne · Quantitative Asset & Risk Management II",
-)
+from pathlib import Path as BannerPath
+st.image(str(BannerPath(__file__).parent / "assets/leman_banner.png"), width="stretch")
+
 
 st.markdown(
     badge("Live · Universe screening", live=True) + badge("In development · ERC & backtesting", live=False),
