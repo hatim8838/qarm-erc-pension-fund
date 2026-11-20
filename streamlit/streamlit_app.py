@@ -37,6 +37,9 @@ navigation = st.navigation(
         "Transparency": [
             st.Page(APP_DIR / PAGES["methodology"], title="Methodology", icon=":material/menu_book:"),
         ],
+        "About us": [
+            st.Page(APP_DIR / "team.py", title="Team", icon=":material/groups:"),
+        ],
     }
 )
 
