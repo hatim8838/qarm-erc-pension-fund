@@ -10,7 +10,7 @@ import streamlit as st
 
 APP_DIR = Path(__file__).resolve().parent
 
-APP_NAME = "QARM | ERC Pension Fund"
+APP_NAME = "Léman Wealth Management"
 
 # Page files (relative to the entry point) - one place for st.Page / st.page_link.
 PAGES = {
