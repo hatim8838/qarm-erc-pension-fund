@@ -133,7 +133,7 @@ st.markdown(
   <div class="m-card"><h4>ESG screening</h4><ul>
     <li>Each stock is compared with peers of the same region and industry.</li>
     <li>You choose the cut-off, from "no filter" to the best 10%.</li>
-    <li>Optional: ESG-tilted risk budgets, proportional to each stock's ESG score.</li></ul></div>
+    <li>Only the stocks that pass your screen enter the portfolio.</li></ul></div>
   <div class="m-card"><h4>Risk estimation</h4><ul>
     <li>Volatility and correlations measured over the last {ESTIMATION_WINDOW} business days.</li>
     <li>Statistical shrinkage keeps large groups of stocks stable.</li>

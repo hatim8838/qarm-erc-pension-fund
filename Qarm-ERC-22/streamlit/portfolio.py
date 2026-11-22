@@ -178,19 +178,11 @@ else:
 # --------------------------------------------------------------------------- #
 as_of = rebalancing_calendar()[0]  # most recent monthly rebalancing date
 
-with st.container(key="card_settings"):
-    budget_label = st.radio(
-        "Risk budgets inside the equity regions",
-        ["Equal risk contribution (ERC)", "ESG-tilted risk budgets"],
-        horizontal=True,
-        help="ERC: every stock gets the same risk budget (LN 5). ESG-tilted: the risk budget of a stock is "
-        "proportional to its ESG score (the team's extension of the risk-budgeting framework).",
-    )
-    st.caption(
-        f"Risk estimated on the last {ESTIMATION_WINDOW} business days, as of {fmt_date(as_of)} · "
-        "long-only · fully invested."
-    )
-esg_budgets = budget_label.startswith("ESG")
+st.caption(
+    f"Risk estimated on the last {ESTIMATION_WINDOW} business days, as of {fmt_date(as_of)} · "
+    "long-only · fully invested."
+)
+esg_budgets = False  # ESG enters through the screen only (ESG ambition in Investor Preferences)
 
 stocks = tuple(sorted((str(r.zone), str(r["name"])) for _, r in selected.iterrows()))
 scores = tuple((i, float(v)) for i, v in selected["esg_score"].items() if pd.notna(v)) if esg_budgets else ()
@@ -454,7 +446,8 @@ with tab_bt:
     else:
         st.caption(
             f"Historical simulation of the full-universe portfolio, monthly rebalancing since {PORTFOLIO_START[:4]}, "
-            "before costs. Past performance is not a forecast. Not recomputed for your selection."
+            "before costs. Past performance is not a forecast. Not recomputed for your selection. "
+            "ESG = same portfolio with risk budgets proportional to ESG scores, shown for comparison."
         )
         rets = ref["returns"]
         base = ["ERC", "ESG", "60/40", "1/N"]
@@ -533,7 +526,9 @@ with st.expander("Method and limitations"):
         "remaining sleeve carries 1/N of the risk with the new N (e.g. 1/5 instead of 1/6). The freed capital is "
         "spread over the remaining sleeves, bonds (the calmest) taking the largest part; the weights inside each "
         "sleeve do not change.\n"
-        "- **ESG option**: risk budgets proportional to ESG scores instead of equal budgets.\n"
+        "- **ESG**: applied through the best-in-class screen chosen in Investor Preferences; only the selected "
+        "stocks enter the portfolio. The backtest also shows, for comparison, a variant with risk budgets "
+        "proportional to ESG scores.\n"
         "- **Limits**: estimates are historical and do not guarantee future risk. Stock lists are today's index "
         "constituents and ESG scores are a recent snapshot. Educational project, not investment advice."
     )
