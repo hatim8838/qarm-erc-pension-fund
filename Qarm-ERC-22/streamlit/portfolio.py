@@ -195,12 +195,6 @@ except (ValueError, FileNotFoundError) as exc:
     st.error(f"The portfolio could not be computed: {exc}")
     st.stop()
 
-if port.dropped:
-    st.caption(
-        f"{len(port.dropped)} selected asset(s) are left out on this date: they do not have a complete "
-        f"{ESTIMATION_WINDOW}-day return history."
-    )
-
 sleeves = list(port.sleeve_weights.index)
 n_sleeves = len(sleeves)
 w = port.weights
