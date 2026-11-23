@@ -188,7 +188,7 @@ DEFAULT_PREFERENCES: dict = {
     "regions": list(ZONES),
     "all_industries": True,
     "sectors": [],
-    "esg_label": "Medium",
+    "esg_label": "None",  # the web app does not use ESG: "None" = no ESG filter
     "eligible_only": True,
     "include_commodities": True,
 }

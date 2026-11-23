@@ -1,14 +1,13 @@
 """Universe Explorer (Amber design): results of the investor screening."""
 
 import streamlit as st
-import pandas as pd
 import plotly.express as px
 
-from web_util import AMBER, CHART_BLUE, PAGES, chart_colors, RESULT_KEY, SLEEVE_COLORS, page_header, section_header, style_figure
+from web_util import CHART_BLUE, PAGES, RESULT_KEY, SLEEVE_COLORS, page_header, section_header, style_figure
 
 page_header(
     "Universe Explorer",
-    "Explore your personalized ESG-screened investment universe.",
+    "Explore your personalized investment universe.",
     eyebrow="Léman Wealth Management · Step 2"
 )
 
@@ -32,7 +31,7 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric("Stocks in scope", funnel["in_scope"])
 c2.metric("Eligible stocks", funnel["eligible_in_scope"])
 c3.metric("Selected stocks", len(selected))
-c4.metric("ESG ambition", params.esg_label)
+c4.metric("Regions", len(params.regions))
 
 st.caption(
     "Screened investment universe — portfolio weights "
@@ -116,38 +115,6 @@ st.caption(
     "not portfolio weights."
 )
 
-# ESG analysis
-section_header("ESG analysis")
-
-a, b, c = st.columns(3)
-
-scores = pd.to_numeric(selected["esg_score"], errors="coerce")
-
-a.metric("Average ESG score", f"{scores.mean():.2f}")
-b.metric("Median ESG score", f"{scores.median():.2f}")
-c.metric("ESG score coverage", f"{scores.notna().mean():.1%}")
-
-st.write("")
-st.markdown("<p class='feature-title'>ESG score distribution</p>", unsafe_allow_html=True)
-fig = px.histogram(
-    selected,
-    x="esg_score",
-    nbins=20,
-    color_discrete_sequence=[AMBER],
-)
-fig = style_figure(fig, height=320)
-fig.update_traces(marker_line_color=chart_colors()["sep"], marker_line_width=2,
-                  hovertemplate="ESG score %{x}<br>%{y} stocks<extra></extra>")
-fig.update_layout(showlegend=False, bargap=0.05, xaxis_title="ESG score (0-100)",
-                  yaxis_title="Number of stocks", margin=dict(t=20))
-st.plotly_chart(fig)
-
-with st.expander("ESG screening adjustments"):
-    for warning in result["warnings"]:
-        st.warning(warning)
-
-    st.dataframe(result["effective_table"], hide_index=True)
-
 # Interactive stock table
 section_header("Selected companies")
 
@@ -171,18 +138,17 @@ if search:
 
 table = filtered[
     ["name", "zone", "country", "industry",
-     "sector", "esg_score", "isin"]
+     "sector", "isin"]
 ].rename(columns={
     "name": "Company",
     "zone": "Region",
     "country": "Country",
     "industry": "Industry",
     "sector": "Sector",
-    "esg_score": "ESG Score",
     "isin": "ISIN"
 })
 
-table = table.sort_values("ESG Score", ascending=False)
+table = table.sort_values(["Region", "Company"])
 
 st.dataframe(table, hide_index=True, width="stretch")
 
@@ -201,7 +167,7 @@ st.markdown("<div style='height:30px'></div>", unsafe_allow_html=True)
 _, cta_col, _ = st.columns([1, 2, 1])
 with cta_col, st.container(key="cta"):
     st.markdown("### Want a different universe?")
-    st.markdown("Change regions, industries or ESG ambition and screen again.")
+    st.markdown("Change regions or industries and screen again.")
     st.page_link(
         PAGES["preferences"],
         label="Modify investor preferences",

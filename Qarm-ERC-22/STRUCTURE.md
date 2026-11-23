@@ -2,6 +2,9 @@
 
 Multi-asset portfolio for a pension fund, built with Equal Risk Contributions (ERC) and extended with ESG-based risk budgeting.
 
+> **Web app:** ESG is not used by the Streamlit app. The ESG parts described below belong to the
+> computation pipeline only.
+
 ## Folder tree
 
 ```

@@ -1,6 +1,9 @@
 # Qarm-ERC-22 — Léman Wealth Management
 
-ERC multi-asset portfolio for a pension fund, with ESG screening and ESG-based risk budgeting.
+ERC multi-asset portfolio for a pension fund.
+
+The web app does **not** use ESG: no ESG filter, score or risk budget is shown or applied. The ESG data and
+the ESG code of the pipeline (`core/esg.py`, `compute_erc.py`) are still in the project but unused by the app.
 QARM II project, HEC Lausanne.
 
 This folder is a complete, self-contained project: data, computation code, web app and tests.
@@ -12,10 +15,10 @@ computations are the same; only the design changed.
 | Page | Content |
 |---|---|
 | **Home** | Mandate, how to use the app, data coverage, roadmap |
-| **Investors › Investor Preferences** | Choose regions, industries, ESG ambition, commodities; run the screening |
-| **Investors › Universe Explorer** | Screened stocks by region, industry and ESG score; downloadable list |
+| **Investors › Investor Preferences** | Choose regions, industries, commodities and start eligibility; build the universe |
+| **Investors › Universe Explorer** | Selected stocks by region and industry; downloadable list |
 | **Portfolio** | Two-level Equal Risk Contribution portfolio: allocation, risk contributions, ERC vs equal weight, holdings, historical backtest |
-| **Methodology** | The method in plain language, data, ESG screen, limitations |
+| **Methodology** | The method in plain language, data, universe, limitations |
 | **About Us** | The team |
 
 ## Quick start

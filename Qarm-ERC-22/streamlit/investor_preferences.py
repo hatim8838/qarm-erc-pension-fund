@@ -1,23 +1,24 @@
-"""Investor Preferences (Amber design): regions, industries, ESG ambition, asset classes and start eligibility.
+"""Investor Preferences (Amber design): regions, industries, asset classes, plus one advanced option.
 
-Runs the real ``core.esg.investor_selection`` (through ``services``) when the
-investor clicks *Screen universe*; the result is stored in session state and
-explored on the Universe Explorer page.
+UX: three short steps with live feedback (step check marks, counts on every choice, the risk
+split of the portfolio), a summary panel with one main action, and clear next steps.
+
+ESG is not used by the web app: the selection always runs with the ESG level "None"
+(no ESG filter), so every stock of the chosen regions and industries is kept.
+The result is stored in session state and explored on the Universe Explorer page.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from copy import copy
 
 import streamlit as st
 
-from core.config import ESTIMATION_WINDOW, ICB_INDUSTRIES, MIN_WINDOW_COVERAGE, PORTFOLIO_START, ZONES
-from core.esg import ESG_LEVELS, RELAX_STEP
+from core.config import ESTIMATION_WINDOW, ICB_INDUSTRIES, PORTFOLIO_START, ZONES
 from services import (
     DEFAULT_PREFERENCES,
-    ESG_LEVEL_DESCRIPTIONS,
-    MIN_STOCKS,
     ZONE_LABELS,
     DataUnavailableError,
     cached_screening,
@@ -27,25 +28,51 @@ from services import (
     scope_counts,
     validate_preferences,
 )
-from web_util import PAGES, PREFS_KEY, RESULT_KEY, fmt_int, fmt_pct, page_header, section_header, step_title
+from web_util import (
+    PAGES,
+    PREFS_KEY,
+    RESULT_KEY,
+    SLEEVE_COLORS,
+    fmt_int,
+    page_header,
+    section_header,
+    step_title,
+)
 
 logger = logging.getLogger(__name__)
 
-# Widget key of each preference field.
-WIDGETS = {
-    "regions": "w_regions",
-    "all_industries": "w_all_industries",
-    "sectors": "w_sectors",
-    "esg_label": "w_esg_label",
-    "eligible_only": "w_eligible_only",
-    "include_commodities": "w_include_commodities",
-}
+# Widget keys. "Industries" is a two-choice radio (all / choose) stored as a bool in the prefs.
+W_REGIONS = "w_regions"
+W_IND_MODE = "w_industry_mode"
+W_SECTORS = "w_sectors"
+W_COMMOD = "w_include_commodities"
+W_ELIGIBLE = "w_eligible_only"
+ALL_IND, CHOOSE_IND = "All industries", "Let me choose"
+LIGHT_TILES = {"Eurozone", "Bonds", "Commodities"}  # dark text on the light colours
+
+st.markdown(
+    """
+<style>
+.ip-blocks {display:flex; flex-wrap:wrap; gap:8px; margin:.3rem 0 .4rem 0;}
+.ip-block {border-radius:10px; padding:.45rem .8rem; font-size:.85rem; font-weight:700; line-height:1.2;}
+.ip-block small {display:block; font-weight:500; font-size:.72rem; opacity:.9;}
+.ip-big {font-size:2.6rem; font-weight:700; line-height:1.05; margin:.1rem 0 0 0;}
+.ip-big-sub {color:#6B7078; font-size:.9rem; margin-bottom:.2rem;}
+.ip-check {font-size:.95rem; line-height:1.5; margin:.25rem 0;}
+.ip-check b {display:inline-block; width:1.3rem;}
+.ip-ok {color:#2E7D32;} .ip-miss {color:#C62828;}
+.ip-fixed {display:inline-block; padding:.15rem .6rem; border-radius:999px; font-size:.75rem; font-weight:700;
+           background:#F0F2F6; color:#555; margin-left:.4rem;}
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
 page_header(
     "Investor Preferences",
-    "Tell us where you want to invest, how demanding the ESG screen should be and whether the "
-    "portfolio holds commodities. The result is the input of the ERC portfolio.",
-    eyebrow="Léman Wealth Management · Step 1",
+    "Three quick choices define where your money can be invested. We then build a portfolio in which "
+    "every block carries the same share of risk.",
+    eyebrow="Léman Wealth Management · Step 1 of 3",
 )
 
 try:
@@ -58,210 +85,235 @@ except DataUnavailableError as exc:
 # State: answers persist across pages in PREFS_KEY; widgets are seeded from it.
 # --------------------------------------------------------------------------- #
 prefs = st.session_state.setdefault(PREFS_KEY, copy(DEFAULT_PREFERENCES))
-for field, key in WIDGETS.items():
+_seed = {
+    W_REGIONS: lambda: copy(prefs.get("regions", DEFAULT_PREFERENCES["regions"])),
+    W_IND_MODE: lambda: ALL_IND if prefs.get("all_industries", True) else CHOOSE_IND,
+    W_SECTORS: lambda: copy(prefs.get("sectors", [])),
+    W_COMMOD: lambda: prefs.get("include_commodities", True),
+    W_ELIGIBLE: lambda: prefs.get("eligible_only", True),
+}
+for key, value in _seed.items():
     if key not in st.session_state:
-        st.session_state[key] = copy(prefs.get(field, DEFAULT_PREFERENCES[field]))
+        st.session_state[key] = value()
+
+
+def _plain_warning(text: str) -> str | None:
+    """Rewrite the selection warnings of ``core`` in plain words, without ESG vocabulary."""
+    m = re.match(r"(.+?): only (\d+) stocks exist in the selected sectors \(minimum (\d+)\)", text)
+    if m:
+        zone, n, minimum = m.groups()
+        return (f"{zone} has only {n} stock(s) in the chosen industries (we recommend at least {minimum}). "
+                "The portfolio still works, but this region will rely on very few companies.")
+    m = re.match(r"(.+?): no stocks in the selected sectors", text)
+    if m:
+        return f"{m.group(1)} has no stock in the chosen industries, so it is left out of your universe."
+    return None if "ESG" in text else text
 
 
 def _reset() -> None:
-    for f, k in WIDGETS.items():
-        st.session_state[k] = copy(DEFAULT_PREFERENCES[f])
-    st.session_state[PREFS_KEY] = copy(DEFAULT_PREFERENCES)
+    d = DEFAULT_PREFERENCES
+    st.session_state.update({
+        W_REGIONS: copy(d["regions"]), W_IND_MODE: ALL_IND if d["all_industries"] else CHOOSE_IND,
+        W_SECTORS: copy(d["sectors"]), W_COMMOD: d["include_commodities"], W_ELIGIBLE: d["eligible_only"],
+    })
+    st.session_state[PREFS_KEY] = copy(d)
     st.session_state.pop(RESULT_KEY, None)
 
 
-form_col, side_col = st.columns([3, 2], gap="large")
+def _all_regions() -> None:
+    st.session_state[W_REGIONS] = list(ZONES)
+
+
+def _no_regions() -> None:
+    st.session_state[W_REGIONS] = []
+
+
+zone_counts = universe["zone"].value_counts()
+# Top to bottom: the three questions, the advanced option, then the summary with "Build my universe".
+form_col = st.container()
+side_col = st.container()
 
 with form_col:
     # 1. Regions ------------------------------------------------------------
+    regions = st.session_state[W_REGIONS] or []
     with st.container(key="card_regions"):
-        step_title(1, "Investor regions")
+        step_title(1, "Where do you want to invest?", done=bool(regions),
+                   hint="Pick one or more equity regions. The number is the stocks in each index.")
         st.pills(
-            "Investor regions",
+            "Equity regions",
             options=list(ZONES),
             selection_mode="multi",
-            format_func=lambda z: ZONE_LABELS[z],
-            key=WIDGETS["regions"],
+            format_func=lambda z: f"{ZONE_LABELS[z]} · {int(zone_counts.get(z, 0))}",
+            key=W_REGIONS,
             label_visibility="collapsed",
         )
-        st.caption(
-            "Six investor zones built from four source indices: MSCI Pacific is split into Asia and "
-            "Oceania, MSCI EM EMEA into Middle East & Africa and Emerging Europe (by listing country)."
-        )
-    regions = st.session_state[WIDGETS["regions"]] or []
+        q1, q2, _ = st.columns([1, 1, 7], gap="small")
+        q1.button("Select all", on_click=_all_regions, type="tertiary", icon=":material/done_all:")
+        q2.button("Clear", on_click=_no_regions, type="tertiary", icon=":material/close:")
+        with st.expander("What is in each region?"):
+            st.markdown(
+                "- **US**: the S&P 500, the 500 largest US companies.\n"
+                "- **Eurozone**: MSCI EMU, large and mid caps of the euro-area countries.\n"
+                "- **Pacific**: MSCI Pacific (Japan, Australia, Hong Kong, Singapore, New Zealand).\n"
+                "- **EM EMEA**: MSCI Emerging Markets Europe, Middle East & Africa."
+            )
+    regions = st.session_state[W_REGIONS] or []
 
     # 2. Industries ---------------------------------------------------------
     with st.container(key="card_industries"):
-        step_title(2, "Industries (ICB)")
-        all_industries = st.toggle("All industries", key=WIDGETS["all_industries"])
-        counts = industry_counts(universe, regions)
-        st.multiselect(
-            "ICB industries",
-            options=ICB_INDUSTRIES,
-            format_func=lambda i: f"{i} · {counts[i]}" if counts[i] else f"{i} · none in selected regions",
-            key=WIDGETS["sectors"],
-            disabled=all_industries,
-            placeholder="Choose one or more industries",
-            help="The number after each industry is the count of stocks in the selected regions.",
-        )
-        gaps = missing_industries_by_zone(universe, regions)
-        if gaps:
-            st.caption(
-                "Not represented: "
-                + "; ".join(f"{zone} has no {', '.join(inds)}" for zone, inds in gaps.items())
-                + "."
+        mode = st.session_state.get(W_IND_MODE) or ALL_IND
+        sectors = st.session_state[W_SECTORS] or []
+        step_title(2, "Which industries?", done=(mode == ALL_IND or bool(sectors)),
+                   hint="Keep them all for the broadest diversification, or focus on a few.")
+        mode = st.radio("Industries", [ALL_IND, CHOOSE_IND], key=W_IND_MODE, horizontal=True,
+                        label_visibility="collapsed")
+        all_industries = mode == ALL_IND
+        if not all_industries:
+            counts = industry_counts(universe, regions)
+            st.pills(
+                "ICB industries",
+                options=ICB_INDUSTRIES,
+                selection_mode="multi",
+                format_func=lambda i: f"{i} · {counts[i]}",
+                key=W_SECTORS,
+                label_visibility="collapsed",
             )
-    sectors = st.session_state[WIDGETS["sectors"]]
+            st.caption("The number is the stocks of that industry in your regions.")
+            gaps = missing_industries_by_zone(universe, regions)
+            if gaps:
+                st.caption("Not available: " + "; ".join(f"{z} has no {', '.join(i)}" for z, i in gaps.items()) + ".")
+    sectors = st.session_state[W_SECTORS] or []
 
-    # 3. ESG ambition -------------------------------------------------------
-    with st.container(key="card_esg"):
-        step_title(3, "ESG ambition")
-        esg_label = st.select_slider("ESG ambition", options=list(ESG_LEVELS), key=WIDGETS["esg_label"],
-                                     label_visibility="collapsed")
-        st.markdown(f"**{esg_label}** (percentile cut {ESG_LEVELS[esg_label]:.2f}): "
-                    f"{ESG_LEVEL_DESCRIPTIONS[esg_label]}")
-        with st.expander("How the ESG screen works"):
-            st.markdown(
-                "- **Best-in-class, not an absolute threshold.** Each stock is compared with its peers "
-                "in the same *investor zone × ICB industry*. “High” keeps scores at or above the 75th "
-                "percentile of the peer group: it does **not** mean an ESG score ≥ 75/100.\n"
-                "- Stocks **without an ESG score** are excluded as soon as the ambition is above None.\n"
-                f"- **Automatic relaxation:** if fewer than {MIN_STOCKS} stocks of a zone pass the cut, "
-                f"the cut is lowered for that zone in steps of {RELAX_STEP:.2f} until {MIN_STOCKS} "
-                "stocks survive (or the cut reaches 0). Every relaxation is reported after screening.\n"
-                "- ESG scores are the latest available (static) scores; see Methodology for the "
-                "look-ahead caveat."
-            )
-
-    # 4. Asset classes -----------------------------------------------------
+    # 3. Asset classes -----------------------------------------------------
     with st.container(key="card_assets"):
-        step_title(4, "Asset classes")
-        st.toggle("Bonds (US Aggregate)", value=True, disabled=True,
-                  help="Bonds are part of every portfolio: they are the low-risk core of the pension mandate.")
-        include_commodities = st.toggle("Commodities (Energy, Precious Metals, Agriculture)",
-                                        key=WIDGETS["include_commodities"])
-        n_blocks = len(regions) + (2 if include_commodities else 1)
-        st.caption(
-            "Bonds are always held. Commodities are optional: they protect against inflation (2022) but have "
-            "low long-run returns, and they are not covered by the ESG screen (the Energy index holds oil "
-            "and gas futures). "
-            + (f"Your portfolio has **{n_blocks} blocks**, each carrying **1/{n_blocks}** of the risk."
-               if regions else "")
-        )
+        step_title(3, "Which other asset classes?", done=True,
+                   hint="Bonds are the calm core of a pension portfolio; commodities are optional.")
+        st.markdown('**Bonds** (US Aggregate)<span class="ip-fixed">Always included</span>', unsafe_allow_html=True)
+        include_commodities = st.toggle("Add commodities (Energy, Precious Metals, Agriculture)", key=W_COMMOD,
+                                        help="They protect against inflation, as in 2022, but have low long-run returns.")
+        blocks = list(regions) + ["Bonds"] + (["Commodities"] if include_commodities else [])
+        n = len(blocks)
+        if regions:
+            tiles = "".join(
+                f'<span class="ip-block" style="background:{SLEEVE_COLORS[b]};'
+                f'color:{"#000" if b in LIGHT_TILES else "#FFF"}">{b}<small>1/{n} of risk</small></span>'
+                for b in blocks
+            )
+            st.markdown(f"Your portfolio will have **{n} blocks**, each carrying the same share of risk:"
+                        f'<div class="ip-blocks">{tiles}</div>', unsafe_allow_html=True)
 
-    # 5. Eligibility --------------------------------------------------------
-    with st.container(key="card_eligibility"):
-        step_title(5, "Portfolio-start eligibility")
-        eligible_only = st.toggle(f"Eligible at portfolio start only ({PORTFOLIO_START})",
-                                  key=WIDGETS["eligible_only"])
+    # Advanced ---------------------------------------------------------------
+    with st.expander("Advanced option"):
+        eligible_only = st.toggle("Only stocks with a full price history (recommended)", key=W_ELIGIBLE)
         st.caption(
-            f"A stock is eligible if it has valid returns on at least {MIN_WINDOW_COVERAGE:.0%} of the "
-            f"{ESTIMATION_WINDOW}-business-day window before {PORTFOLIO_START}, the first rebalancing date. "
-            "Eligibility is fixed at that date. Switch it off only for exploratory analysis."
+            f"Keeps the stocks that already had one full year of prices ({ESTIMATION_WINDOW} trading days) "
+            f"on {PORTFOLIO_START}, the portfolio start, so that their risk can be measured. "
+            "Switch it off only to explore the whole index."
         )
 
 # Remember the answers for the next visit.
-prefs.update({f: copy(st.session_state[k]) for f, k in WIDGETS.items()})
+prefs.update({
+    "regions": copy(regions), "all_industries": all_industries, "sectors": copy(sectors),
+    "eligible_only": eligible_only, "include_commodities": include_commodities,
+})
 
-params, errors = validate_preferences(regions, all_industries, sectors, esg_label, eligible_only, universe,
+params, errors = validate_preferences(regions, all_industries, sectors, "None", eligible_only, universe,
                                      include_commodities=include_commodities)
 applied = st.session_state.get(RESULT_KEY)
+stale = applied is not None and params is not None and applied["params"] != params
 
 with side_col:
     with st.container(key="card_summary"):
         st.markdown("<p class='feature-title'>Your selection</p>", unsafe_allow_html=True)
         preview = scope_counts(universe, regions, None if all_industries else sectors)
-        m1, m2 = st.columns(2)
-        m1.metric("Stocks in scope", fmt_int(preview["in_scope"]),
-                  help="Constituents of the selected regions and industries, before any filter.")
-        m2.metric(f"Eligible on {PORTFOLIO_START}", fmt_int(preview["eligible"]))
-        st.markdown(
-            f"**Regions:** {', '.join(regions) if regions else '—'}  \n"
-            f"**Industries:** {'All' if all_industries else (', '.join(sectors) if sectors else '—')}  \n"
-            f"**ESG ambition:** {esg_label}  \n"
-            f"**Asset classes:** equities, bonds{', commodities' if include_commodities else ''}  \n"
-            f"**Universe:** {'eligible at start only' if eligible_only else 'all constituents'}"
+        n_universe = preview["eligible"] if eligible_only else preview["in_scope"]
+        num_col, list_col, act_col = st.columns([2, 4, 3], gap="large", vertical_alignment="center")
+        num_col.markdown(
+            f'<div class="ip-big">{fmt_int(n_universe)}</div>'
+            f'<div class="ip-big-sub">stocks in your universe'
+            + (f" (out of {fmt_int(preview['in_scope'])} in these indices)" if eligible_only else "")
+            + "</div>",
+            unsafe_allow_html=True,
         )
+
+        def _line(ok: bool, label: str, value: str) -> str:
+            mark = '<b class="ip-ok">✓</b>' if ok else '<b class="ip-miss">✗</b>'
+            return f'<div class="ip-check">{mark}<strong>{label}:</strong> {value}</div>'
+
+        ind_txt = "all" if all_industries else (", ".join(sectors) if sectors else "choose at least one")
+        list_col.markdown(
+            _line(bool(regions), "Regions", ", ".join(regions) if regions else "choose at least one")
+            + _line(all_industries or bool(sectors), "Industries", ind_txt)
+            + _line(True, "Asset classes", "equities, bonds" + (", commodities" if include_commodities else "")),
+            unsafe_allow_html=True,
+        )
+        with act_col:
+            submitted = st.button("Build my universe", type="primary", icon=":material/arrow_forward:",
+                                  disabled=params is None, width="stretch")
+            st.button("Reset to defaults", on_click=_reset, type="tertiary", icon=":material/restart_alt:")
         for err in errors:
             st.warning(err, icon=":material/error:")
-        if applied is not None and params is not None and applied["params"] != params:
-            st.caption("**Your changes are not applied yet.**")
+        if stale:
+            st.markdown('<div class="amber-callout">You changed your answers. Click <b>Build my universe</b> '
+                        "to update the results.</div>", unsafe_allow_html=True)
 
-        b1, b2 = st.columns([3, 2])
-        submitted = b1.button("Screen universe", type="primary", icon=":material/filter_alt:",
-                              disabled=params is None, width="stretch")
-        b2.button("Reset", on_click=_reset, icon=":material/restart_alt:", width="stretch")
-
-    with st.expander("Fixed screening settings"):
-        st.markdown(
-            "- Method: best-in-class percentile within zone × industry\n"
-            f"- Minimum stocks per zone: {MIN_STOCKS}\n"
-            f"- Relaxation step: {RELAX_STEP:.2f}\n"
-            "These settings belong to the team's screening model and are not editable here."
-        )
 
 # --------------------------------------------------------------------------- #
-# Run the real screening
+# Run the selection
 # --------------------------------------------------------------------------- #
 if submitted and params is not None:
     try:
         st.session_state[RESULT_KEY] = cached_screening(params)
         applied = st.session_state[RESULT_KEY]
+        stale = False
+        st.toast(f"Universe ready: {fmt_int(applied['funnel']['selected'])} stocks.", icon=":material/check_circle:")
     except DataUnavailableError as exc:
         st.error(str(exc))
     except (ValueError, KeyError, FileNotFoundError) as exc:
-        st.error(f"The screening could not run with these answers: {exc}")
+        st.error(f"The universe could not be built with these answers: {exc}")
     except Exception as exc:  # unexpected: log it and show a readable message
         logger.exception("Screening failed")
-        st.error("Unexpected error while screening the universe. Please adjust the answers or reload the app.")
+        st.error("Unexpected error while building the universe. Please adjust the answers or reload the app.")
         with st.expander("Technical details"):
             st.code(f"{type(exc).__name__}: {exc}")
 
 # --------------------------------------------------------------------------- #
-# Result summary (details in the Universe Explorer)
+# Result and next steps
 # --------------------------------------------------------------------------- #
 if applied is not None:
     p, funnel = applied["params"], applied["funnel"]
-    section_header("Screening result")
-    st.caption(
-        f"{', '.join(p.regions)} · {'all industries' if p.sectors is None else ', '.join(p.sectors)} · "
-        f"ESG {p.esg_label} · {'with' if p.include_commodities else 'without'} commodities · "
-        f"{'eligible at start only' if p.eligible_only else 'all constituents'}. "
-        f"The ERC portfolio is built on {p.n_sleeves} blocks: {', '.join(p.regions)}, "
-        f"{' and '.join(p.non_equity_sleeves)}."
-    )
+    section_header("Your universe" + (" (previous answers)" if stale else ""))
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("In scope", fmt_int(funnel["in_scope"]), help="Stocks of the chosen regions and industries.")
-    k2.metric(f"Eligible on {PORTFOLIO_START}", fmt_int(funnel["eligible_in_scope"]))
-    k3.metric("Screened candidates", fmt_int(funnel["candidates"]),
-              help="Stocks that entered the ESG screen (eligible ones only if that option is on).")
-    share = funnel["selected"] / funnel["candidates"] if funnel["candidates"] else float("nan")
-    k4.metric("ESG-selected", fmt_int(funnel["selected"]),
-              help=f"{fmt_pct(share)} of the screened candidates.")
+    k1.metric("Stocks", fmt_int(funnel["selected"]))
+    k2.metric("Regions", len(p.regions), help=", ".join(p.regions))
+    k3.metric("Industries", "All" if p.sectors is None else len(p.sectors),
+              help=None if p.sectors is None else ", ".join(p.sectors))
+    k4.metric("Portfolio blocks", p.n_sleeves, help=f"Each carries 1/{p.n_sleeves} of the risk.")
     if not p.eligible_only:
-        st.caption(f"{fmt_int(funnel['selected_eligible'])} of the ESG-selected stocks are eligible on {PORTFOLIO_START}.")
-
-    for w in applied["warnings"]:
+        st.caption(f"{fmt_int(funnel['selected_eligible'])} of these stocks have a full price history on "
+                   f"{PORTFOLIO_START}.")
+    for w in filter(None, map(_plain_warning, applied["warnings"])):
         st.warning(w, icon=":material/info:")
 
-    eff = applied["effective_table"]
-    relaxed = bool((eff["status"] != "As requested").any())
-    with st.expander("Requested vs effective ESG cut per zone", expanded=relaxed):
-        st.dataframe(
-            eff,
-            hide_index=True,
-            width="stretch",
-            column_config={
-                "zone": "Investor zone",
-                "requested": st.column_config.NumberColumn("Requested percentile", format="%.2f"),
-                "effective": st.column_config.NumberColumn("Effective percentile", format="%.2f"),
-                "status": "Status",
-            },
-        )
-
-    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
-    _, cta_col, _ = st.columns([1, 2, 1])
-    with cta_col, st.container(key="cta"):
-        st.markdown("### Your universe is ready")
-        st.markdown("See which companies passed the screen, by region, industry and ESG score.")
-        st.page_link(PAGES["explorer"], label="Explore the screened universe", icon=":material/arrow_forward:")
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+    # Same height for both boxes: the row stretches its columns, each box fills its column,
+    # and the link sits at the bottom so the two links line up.
+    st.markdown(
+        """<style>
+        [data-testid="stHorizontalBlock"]:has(.st-key-cta_explore) {align-items: stretch;}
+        [data-testid="stLayoutWrapper"]:has(> .st-key-cta_explore),
+        [data-testid="stLayoutWrapper"]:has(> .st-key-cta_portfolio) {flex: 1 1 auto;}
+        .st-key-cta_explore, .st-key-cta_portfolio {display: flex; flex-direction: column;}
+        .st-key-cta_explore > div:last-child, .st-key-cta_portfolio > div:last-child {margin-top: auto;}
+        </style>""",
+        unsafe_allow_html=True,
+    )
+    c1, c2 = st.columns(2, gap="medium")
+    with c1, st.container(key="cta_explore"):
+        st.markdown("### Step 2 · Explore the stocks")
+        st.markdown("See which companies are in your universe, by region and industry.")
+        st.page_link(PAGES["explorer"], label="Open the Universe Explorer", icon=":material/travel_explore:")
+    with c2, st.container(key="cta_portfolio"):
+        st.markdown("### Step 3 · See your portfolio")
+        st.markdown("The risk-balanced allocation built from this universe.")
+        st.page_link("portfolio.py", label="Open the ERC Portfolio", icon=":material/donut_large:")

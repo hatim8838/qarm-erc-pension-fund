@@ -7,7 +7,6 @@ All numbers come from ``data/processed/``; nothing is invented.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -111,11 +110,11 @@ def load_returns(stocks: tuple[tuple[str, str], ...], include_commodities: bool 
 
 
 @st.cache_data(show_spinner="Estimating covariance and solving the ERC problem…", max_entries=48)
-def compute_portfolio(stocks, scores, as_of, esg_budgets: bool, include_commodities: bool = True):
+def compute_portfolio(stocks, as_of, include_commodities: bool = True):
+    """Equal risk budgets everywhere (no ESG input)."""
     returns = load_returns(stocks, include_commodities)
     window, dropped = estimation_window(returns, pd.Timestamp(as_of), ESTIMATION_WINDOW)
-    esg = pd.Series(dict(scores), dtype=float) if esg_budgets else None
-    return build_erc_portfolio(window, esg_scores=esg, dropped=dropped)
+    return build_erc_portfolio(window, esg_scores=None, dropped=dropped)
 
 
 @st.cache_data(show_spinner=False)
@@ -147,7 +146,7 @@ result = st.session_state.get(RESULT_KEY)
 using_default = result is None
 if using_default:
     try:
-        result = cached_screening(ScreeningParams(tuple(ZONES), None, "Medium", True))
+        result = cached_screening(ScreeningParams(tuple(ZONES), None, "None", True))
     except DataUnavailableError as exc:
         st.error(str(exc))
         st.stop()
@@ -157,7 +156,7 @@ params = result["params"]
 if using_default:
     st.markdown(
         '<div class="amber-callout">No investor preferences applied yet: the portfolio below uses the default '
-        "universe (all regions, all industries, ESG ambition Medium).</div>",
+        "universe (all regions, all industries).</div>",
         unsafe_allow_html=True,
     )
     st.page_link(PAGES["preferences"], label="Set your investor preferences", icon=":material/tune:")
@@ -167,7 +166,6 @@ else:
     st.markdown(
         f'<span class="amber-tag">Regions · {regions_txt}</span>'
         f'<span class="amber-tag">{industries_txt}</span>'
-        f'<span class="amber-tag">ESG ambition · {params.esg_label}</span>'
         f'<span class="amber-tag">Commodities · {"included" if params.include_commodities else "excluded"}</span>'
         f'<span class="amber-tag">{len(selected)} selected stocks</span>',
         unsafe_allow_html=True,
@@ -182,10 +180,8 @@ st.caption(
     f"Risk estimated on the last {ESTIMATION_WINDOW} business days, as of {fmt_date(as_of)} · "
     "long-only · fully invested."
 )
-esg_budgets = False  # ESG enters through the screen only (ESG ambition in Investor Preferences)
 
 stocks = tuple(sorted((str(r.zone), str(r["name"])) for _, r in selected.iterrows()))
-scores = tuple((i, float(v)) for i, v in selected["esg_score"].items() if pd.notna(v)) if esg_budgets else ()
 include_commodities = params.include_commodities
 if selected.empty:
     st.warning(
@@ -194,7 +190,7 @@ if selected.empty:
     )
 
 try:
-    port = compute_portfolio(stocks, scores, as_of.strftime("%Y-%m-%d"), esg_budgets, include_commodities)
+    port = compute_portfolio(stocks, as_of.strftime("%Y-%m-%d"), include_commodities)
 except (ValueError, FileNotFoundError) as exc:
     st.error(f"The portfolio could not be computed: {exc}")
     st.stop()
@@ -335,18 +331,9 @@ with tab_risk:
             fig = go.Figure()
             fig.add_bar(name="Weight inside sleeve", x=names, y=100 * inner_w[order].to_numpy(), marker_color=LIGHT)
             fig.add_bar(name="Risk contribution", x=names, y=100 * inner_rc[order].to_numpy(), marker_color=RISK)
-            if port.esg_budgets and sleeve in ZONES:
-                fig.add_scatter(
-                    name="Risk budget (ESG)",
-                    x=names,
-                    y=100 * budget[order].to_numpy(),
-                    mode="markers",
-                    marker=dict(symbol="line-ew-open", size=16, color=AMBER, line=dict(width=2, color=AMBER)),
-                )
             fig.update_layout(barmode="group", yaxis_title="% of the sleeve", xaxis_tickangle=-45)
             fig = style_figure(fig, height=420)
-            if not (port.esg_budgets and sleeve in ZONES):  # equal budgets: one common target
-                add_target_line(fig, 100 / len(inner_w), f"Target 1/{len(inner_w)}")
+            add_target_line(fig, 100 / len(inner_w), f"Target 1/{len(inner_w)}")  # equal budgets
             st.plotly_chart(fig)
 
 # --------------------------------------------------------------------------- #
@@ -395,12 +382,10 @@ with tab_ew:
 # Holdings
 # --------------------------------------------------------------------------- #
 with tab_hold:
-    esg_map = selected["esg_score"].to_dict()
     hold = pd.DataFrame(
         {
             "Sleeve": [i.split(ASSET_ID_SEP, 1)[0] for i in w.index],
             "Asset": [i.split(ASSET_ID_SEP, 1)[1] for i in w.index],
-            "ESG score": [f"{esg_map[i]:.1f}" if pd.notna(esg_map.get(i, np.nan)) else "–" for i in w.index],
             "Capital weight (%)": 100 * w.to_numpy(),
             "Share of total risk (%)": 100 * port.risk_share.reindex(w.index).to_numpy(),
             "Stand-alone volatility (%)": 100 * port.asset_vol.reindex(w.index).to_numpy(),
@@ -419,7 +404,6 @@ with tab_hold:
         width="stretch",
         height=460,
         column_config={
-            "ESG score": st.column_config.TextColumn(),
             "Capital weight (%)": st.column_config.NumberColumn(format="%.3f"),
             "Share of total risk (%)": st.column_config.NumberColumn(format="%.3f"),
             "Stand-alone volatility (%)": st.column_config.NumberColumn(format="%.1f"),
@@ -446,14 +430,13 @@ with tab_bt:
     else:
         st.caption(
             f"Historical simulation of the full-universe portfolio, monthly rebalancing since {PORTFOLIO_START[:4]}, "
-            "before costs. Past performance is not a forecast. Not recomputed for your selection. "
-            "ESG = same portfolio with risk budgets proportional to ESG scores, shown for comparison."
+            "before costs. Past performance is not a forecast. Not recomputed for your selection."
         )
         rets = ref["returns"]
-        base = ["ERC", "ESG", "60/40", "1/N"]
+        base = ["ERC", "60/40", "1/N"]
         # Without commodities, show the ex-commodities backtests (ERC on 5 sleeves) when compute_erc.py
         # has produced them; 60/40 holds no commodities, so it is the same in both cases.
-        ex_cols = {b: f"{b}{EX_COMMODITIES_SUFFIX}" for b in ("ERC", "ESG", "1/N")}
+        ex_cols = {b: f"{b}{EX_COMMODITIES_SUFFIX}" for b in ("ERC", "1/N")}
         has_ex = all(c in rets.columns for c in ex_cols.values())
         if not include_commodities and has_ex:
             base = [ex_cols.get(b, b) for b in base]
@@ -526,9 +509,6 @@ with st.expander("Method and limitations"):
         "remaining sleeve carries 1/N of the risk with the new N (e.g. 1/5 instead of 1/6). The freed capital is "
         "spread over the remaining sleeves, bonds (the calmest) taking the largest part; the weights inside each "
         "sleeve do not change.\n"
-        "- **ESG**: applied through the best-in-class screen chosen in Investor Preferences; only the selected "
-        "stocks enter the portfolio. The backtest also shows, for comparison, a variant with risk budgets "
-        "proportional to ESG scores.\n"
         "- **Limits**: estimates are historical and do not guarantee future risk. Stock lists are today's index "
-        "constituents and ESG scores are a recent snapshot. Educational project, not investment advice."
+        "constituents. Educational project, not investment advice."
     )

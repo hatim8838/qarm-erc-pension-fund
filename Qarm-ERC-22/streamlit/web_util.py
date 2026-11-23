@@ -25,7 +25,7 @@ PREFS_KEY = "investor_prefs"        # last answers of the questionnaire (survive
 RESULT_KEY = "screening_result"     # last applied screening (dict from services.run_screening)
 
 # Modules planned by the quant team; shown as text only, never as working pages.
-COMING_LATER = ["ERC Optimization", "ESG Risk Budgeting", "Backtesting", "Performance Analytics"]
+COMING_LATER = ["ERC Optimization", "Backtesting", "Performance Analytics"]
 
 # --------------------------------------------------------------------------- #
 # Brand palette: the Léman identity (logo + banner) is black & white with serif
@@ -56,16 +56,15 @@ SLEEVE_COLORS = {          # Amber design: blue / gold / amber / navy family
 SLATE_BLUE = "#5F7D9C"     # mid step: the one "coloured" series next to charcoal
 ACCENT = SLATE_BLUE
 # Portfolio / benchmark series: charcoal = the house portfolio, slate/greys = others.
-SERIES_COLORS = {          # Amber design: blue = house ERC, gold = ESG, amber / grey = references
+SERIES_COLORS = {          # Amber design: blue = house ERC, amber / grey = references
     "ERC": "#1976D2",
-    "ESG": "#F9A825",
     "60/40": "#CC6600",
     "1/N": "#9E9E9E",
     "S&P 500": SLEEVE_COLORS["Pacific"],
     "AGG": SLEEVE_COLORS["Bonds"],
 }
 # Line style per series (second cue besides the close colours).
-SERIES_DASH = {"ERC": "solid", "ESG": "solid", "60/40": "dash", "1/N": "dot"}
+SERIES_DASH = {"ERC": "solid", "60/40": "dash", "1/N": "dot"}
 # Default sequence for charts without an explicit colour per series.
 COLORWAY = [CHARCOAL, *SLEEVE_COLORS.values()]
 
@@ -191,15 +190,22 @@ div[data-testid="stMetric"] {{background: #FFFFFF; padding: 15px; border-radius:
 .feature-title {{font-size: 22px !important; font-weight: 700; margin-bottom: 8px;}}
 .feature-card {{background: {PEACH}; padding: 20px; border-radius: 12px; min-height: 120px;
     display: flex; align-items: center; font-size: 16px; color: #1A1A1A;}}
-.st-key-cta {{background: {SOFT_BG}; border-radius: 15px; padding: 30px; text-align: center;
+/* Cards side by side get the height of the tallest one */
+[data-testid="stHorizontalBlock"]:has(.feature-card) {{align-items: stretch;}}
+[data-testid="stElementContainer"]:has(.feature-card) {{flex: 1 1 auto;}}
+[data-testid="stElementContainer"]:has(.feature-card) > div,
+[data-testid="stElementContainer"]:has(.feature-card) [data-testid="stMarkdownContainer"] {{
+    height: 100%; display: flex; flex-direction: column;}}
+.feature-card {{flex: 1 1 auto;}}
+[class*="st-key-cta"] {{background: {SOFT_BG}; border-radius: 15px; padding: 30px; text-align: center;
     border: 1px solid #DDDDDD;}}
-.st-key-cta [data-testid="stPageLink"] {{display: flex; justify-content: center;}}
-.st-key-cta [data-testid="stElementContainer"]:has([data-testid="stPageLink"]) {{align-self: center; width: auto !important;}}
-.st-key-cta [data-testid="stPageLink"] a {{padding: 10px 20px; border-radius: 8px;
+[class*="st-key-cta"] [data-testid="stPageLink"] {{display: flex; justify-content: center;}}
+[class*="st-key-cta"] [data-testid="stElementContainer"]:has([data-testid="stPageLink"]) {{align-self: center; width: auto !important;}}
+[class*="st-key-cta"] [data-testid="stPageLink"] a {{padding: 10px 20px; border-radius: 8px;
     border: 2px solid transparent; transition: all .18s ease;}}
-.st-key-cta [data-testid="stPageLink"] a p {{color: #2E86C1; font-weight: 600; font-size: 17px;}}
-.st-key-cta [data-testid="stPageLink"] a:hover {{background: {PEACH}; border-color: {AMBER};}}
-.st-key-cta [data-testid="stPageLink"] a:hover p {{color: #000;}}
+[class*="st-key-cta"] [data-testid="stPageLink"] a p {{color: #2E86C1; font-weight: 600; font-size: 17px;}}
+[class*="st-key-cta"] [data-testid="stPageLink"] a:hover {{background: {PEACH}; border-color: {AMBER};}}
+[class*="st-key-cta"] [data-testid="stPageLink"] a:hover p {{color: #000;}}
 /* Page header */
 .amber-eyebrow {{color: {AMBER}; font-size: .8rem; letter-spacing: .12em; font-weight: 700;
     text-transform: uppercase; margin-bottom: .2rem;}}
@@ -211,6 +217,8 @@ div[data-testid="stMetric"] {{background: #FFFFFF; padding: 15px; border-radius:
     border-top: 4px solid {AMBER};}}
 .amber-step {{display: flex; align-items: center; gap: .7rem; font-size: 20px; font-weight: 700;
     margin-bottom: .4rem;}}
+.amber-step.done b {{background: {AMBER}; color: #FFFFFF;}}
+.amber-step-hint {{color: #6B7078; font-size: .92rem; margin: -.2rem 0 .7rem 2.7rem;}}
 .amber-step b {{display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
     border-radius: 50%; background: {PEACH}; color: #000; font-size: 16px; flex-shrink: 0;}}
 /* Buttons outside the navbar: peach hover, amber primary */
@@ -260,16 +268,18 @@ div[data-testid="stPopoverBody"] a:hover p {{color: #000;}}
 .st-key-navbar button svg {{color: #F2F2F2; fill: currentColor;}}
 .st-key-navbar button:hover svg {{color: #000;}}
 [data-baseweb="tab-list"] {{border-bottom-color: #2E323B;}}
-div[data-testid="stMetric"], [class*="st-key-card_"], .m-card, .qt-card, .st-key-cta {{
+div[data-testid="stMetric"], [class*="st-key-card_"], .m-card, .qt-card, [class*="st-key-cta"] {{
     background: #1A1D24; border-color: #2E323B; box-shadow: none;}}
 [class*="st-key-card_summary"] {{background: rgba(255,204,153,.07); border-color: #5A4330;
     border-top-color: {AMBER};}}
 .section-header, .qt-section {{border-left-color: #6C8CFF;}}
-.amber-sub, .qt-sub, .m-cap, .m-card p, .m-card li, .qt-bio, .m-warn span {{color: #B8BCC4 !important;}}
+.amber-sub, .amber-step-hint, .qt-sub, .m-cap, .m-card p, .m-card li, .qt-bio, .m-warn span {{color: #B8BCC4 !important;}}
 .m-card h4, .m-warn b, .qt-name {{color: #F2F2F2;}}
-.st-key-cta [data-testid="stPageLink"] a p, .qt-link {{color: #5DADE2 !important;}}
-.st-key-cta [data-testid="stPageLink"] a:hover p, .qt-link:hover {{color: #000 !important;}}
+[class*="st-key-cta"] [data-testid="stPageLink"] a p, .qt-link {{color: #5DADE2 !important;}}
+[class*="st-key-cta"] [data-testid="stPageLink"] a:hover p, .qt-link:hover {{color: #000 !important;}}
 .amber-callout, .m-warn {{background: rgba(255,204,153,.07);}}
+.feature-card, .m-idea {{background: {AMBER}; color: #FFFFFF;}}
+.m-idea h3, .m-idea p, .m-idea b {{color: #FFFFFF !important;}}
 .qt-avatar {{border-color: #1A1D24;}}
 .qt-link-off {{border-color: #3A3F48; color: #6B7078;}}
 .qarm-dev {{background: transparent;}}
@@ -375,9 +385,15 @@ def sub_title(text: str) -> None:
     st.markdown(f'<p class="amber-h4">{text}</p>', unsafe_allow_html=True)
 
 
-def step_title(number: int | str, title: str) -> None:
-    """Numbered step heading (peach circle + bold title) used inside cards."""
-    st.markdown(f'<div class="amber-step"><b>{number}</b>{title}</div>', unsafe_allow_html=True)
+def step_title(number: int | str, title: str, done: bool = False, hint: str = "") -> None:
+    """Numbered step heading used inside cards: peach circle, amber with a check mark once done.
+
+    ``hint`` is a short grey line under the title (what the step is for).
+    """
+    badge_ = "✓" if done else number
+    cls = "amber-step done" if done else "amber-step"
+    sub = f'<div class="amber-step-hint">{hint}</div>' if hint else ""
+    st.markdown(f'<div class="{cls}"><b>{badge_}</b>{title}</div>{sub}', unsafe_allow_html=True)
 
 
 def badge(text: str, live: bool) -> str:

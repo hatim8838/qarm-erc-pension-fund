@@ -59,9 +59,9 @@ TEAM = [
     },
     {
         "name": "Elvedin",
-        "role": "Head of Risk & ESG",
-        "bio": "Monitors portfolio risk and integrates ESG criteria into our investment process.",
-        "tags": ["Risk management", "ESG"],
+        "role": "Head of Risk",
+        "bio": "Monitors portfolio risk and makes sure every portfolio stays within its risk budget.",
+        "tags": ["Risk management", "Risk monitoring"],
         "linkedin": "",
     },
     {

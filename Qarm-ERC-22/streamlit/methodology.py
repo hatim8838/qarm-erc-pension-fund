@@ -45,8 +45,8 @@ st.markdown(
 
 page_header(
     "Methodology",
-    "A transparent, rules-based approach: you choose where to invest and how demanding the ESG "
-    "screen should be; we build a portfolio in which no single position drives the risk.",
+    "A transparent, rules-based approach: you choose where to invest and which asset classes to hold; "
+    "we build a portfolio in which no single position drives the risk.",
     eyebrow="Léman Wealth Management · Transparency",
 )
 
@@ -73,9 +73,9 @@ st.markdown(
     """
 <div class="m-grid m-g4">
   <div class="m-card"><div class="m-num">1</div><h4>You set your preferences</h4>
-    <p>Regions, industries and the level of ESG ambition.</p></div>
-  <div class="m-card"><div class="m-num">2</div><h4>We screen the universe</h4>
-    <p>Only stocks with a strong ESG score compared with their peers are kept.</p></div>
+    <p>Regions, industries and asset classes.</p></div>
+  <div class="m-card"><div class="m-num">2</div><h4>We build your universe</h4>
+    <p>Every stock of your regions and industries with a full year of history is kept.</p></div>
   <div class="m-card"><div class="m-num">3</div><h4>We balance the risk</h4>
     <p>Capital is allocated so that every block of the portfolio carries the same share of risk.</p></div>
   <div class="m-card"><div class="m-num">4</div><h4>We test it on history</h4>
@@ -118,7 +118,7 @@ st.markdown(
 )
 
 # --------------------------------------------------------------------------- #
-# Data / ESG / Risk
+# Data / Universe / Risk
 # --------------------------------------------------------------------------- #
 window = load_data_window()
 window_txt = f"{fmt_date(window[0])} → {fmt_date(window[1])}" if window else "daily history"
@@ -130,10 +130,10 @@ st.markdown(
     <li>Daily total returns in US dollars, {window_txt}.</li>
     <li>Four equity indices (US, Eurozone, Pacific, EM EMEA), a US bond index and three commodity indices (optional).</li>
     <li>Prices are cleaned; a stock needs a full year of history to be included.</li></ul></div>
-  <div class="m-card"><h4>ESG screening</h4><ul>
-    <li>Each stock is compared with peers of the same region and industry.</li>
-    <li>You choose the cut-off, from "no filter" to the best 10%.</li>
-    <li>Only the stocks that pass your screen enter the portfolio.</li></ul></div>
+  <div class="m-card"><h4>Your universe</h4><ul>
+    <li>All index constituents of the regions and industries you choose.</li>
+    <li>Optionally, only the stocks eligible at the portfolio start.</li>
+    <li>Bonds are always held; commodities are optional.</li></ul></div>
   <div class="m-card"><h4>Risk estimation</h4><ul>
     <li>Volatility and correlations measured over the last {ESTIMATION_WINDOW} business days.</li>
     <li>Statistical shrinkage keeps large groups of stocks stable.</li>
@@ -152,7 +152,7 @@ st.markdown(
 <div class="m-grid m-g4">
   <div class="m-warn"><b>Not a forecast</b><span>Past results show how the rules behaved, not how they will behave.</span></div>
   <div class="m-warn"><b>Risk, not returns</b><span>The method balances risk; it does not predict which assets will perform best.</span></div>
-  <div class="m-warn"><b>Historical data</b><span>Stock lists are today's index members and ESG scores are a recent snapshot.</span></div>
+  <div class="m-warn"><b>Historical data</b><span>Stock lists are today's index members, applied over the whole history.</span></div>
   <div class="m-warn"><b>Simplified</b><span>Backtests ignore transaction costs and taxes. Educational project, not investment advice.</span></div>
 </div>
 """,
