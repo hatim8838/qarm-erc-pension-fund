@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Léman App Map</title>
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #eef1f5; --text: #1a1f2b; --muted: #5b6b7f;
+  --line: #d5dbe3; --navy: #1b365d; --accent: #cc6600; --green: #2e7d5b; --red: #b3261e;
+  --raw: #8a5a00; --raw-bg: #fff4e0; --pipe: #1b365d; --pipe-bg: #e7edf6; --proc: #2e7d5b; --proc-bg: #e5f2ec;
+  --svc: #6b3fa0; --svc-bg: #f1eafa; --page: #cc6600; --page-bg: #fff0e0; --arrow: #8592a3;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1117; --surface: #171b24; --surface-2: #1f2430; --text: #e6e9ef; --muted: #9aa6b5;
+    --line: #2c3340; --navy: #8fb0e0; --accent: #ff9933; --green: #6cc49a; --red: #ff8a80;
+    --raw: #f2c46d; --raw-bg: #2a2214; --pipe: #8fb0e0; --pipe-bg: #18233a; --proc: #6cc49a; --proc-bg: #14261e;
+    --svc: #c3a2ec; --svc-bg: #241b33; --page: #ffad5c; --page-bg: #2c1f12; --arrow: #6b7686;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1117; --surface: #171b24; --surface-2: #1f2430; --text: #e6e9ef; --muted: #9aa6b5;
+  --line: #2c3340; --navy: #8fb0e0; --accent: #ff9933; --green: #6cc49a; --red: #ff8a80;
+  --raw: #f2c46d; --raw-bg: #2a2214; --pipe: #8fb0e0; --pipe-bg: #18233a; --proc: #6cc49a; --proc-bg: #14261e;
+  --svc: #c3a2ec; --svc-bg: #241b33; --page: #ffad5c; --page-bg: #2c1f12; --arrow: #6b7686;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 28px 16px 60px; }
+header h1 { margin: 0 0 4px; font-size: 1.7rem; letter-spacing: -.01em; }
+header p { margin: 0; color: var(--muted); max-width: 70rem; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+.chip { font-size: .78rem; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.chip b { color: var(--text); font-weight: 600; }
+h2 { font-size: 1.2rem; margin: 40px 0 6px; }
+h2 + p.sub { margin: 0 0 16px; color: var(--muted); font-size: .92rem; }
+code, .mono { font-family: var(--mono); font-size: .84em; }
+
+/* ---------- Flow diagram ---------- */
+.flow { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.cols { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 34px; position: relative; z-index: 1; }
+.col h3 { margin: 0 0 10px; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.node { border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; border: 1px solid; font-size: .8rem; line-height: 1.35; background: var(--surface); }
+.node b { display: block; font-size: .83rem; margin-bottom: 2px; }
+.node .mono { color: var(--muted); word-break: break-word; }
+.raw  { border-color: var(--raw);  background: var(--raw-bg); }  .raw b  { color: var(--raw); }
+.pipe { border-color: var(--pipe); background: var(--pipe-bg); } .pipe b { color: var(--pipe); }
+.proc { border-color: var(--proc); background: var(--proc-bg); } .proc b { color: var(--proc); }
+.svc  { border-color: var(--svc);  background: var(--svc-bg); }  .svc b  { color: var(--svc); }
+.pg   { border-color: var(--page); background: var(--page-bg); } .pg b   { color: var(--page); }
+.state { border-style: dashed; }
+svg#wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; overflow: visible; }
+svg#wires path { fill: none; stroke: var(--arrow); stroke-width: 1.4; opacity: .75; }
+svg#wires path.session { stroke: var(--accent); stroke-dasharray: 5 4; opacity: .9; }
+svg#wires path.live { stroke: var(--svc); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: .8rem; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--arrow); vertical-align: middle; margin-right: 6px; }
+.legend .l-session::before { border-top: 2px dashed var(--accent); }
+.legend .l-live::before { border-top-color: var(--svc); }
+.stackhint { display: none; text-align: center; color: var(--muted); font-size: 1.2rem; margin: -4px 0 6px; }
+
+/* ---------- Page cards ---------- */
+.pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; border-top: 4px solid var(--page); }
+.card h3 { margin: 0; font-size: 1.05rem; }
+.card .file { font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+.card .role { margin: 6px 0 10px; font-size: .88rem; }
+.card h4 { margin: 12px 0 4px; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+.card h4.in { color: var(--accent); } .card h4.out { color: var(--navy); } .card h4.data { color: var(--green); }
+.card ul { margin: 0; padding-left: 18px; font-size: .85rem; }
+.card li { margin: 2px 0; }
+.tag { display: inline-block; font-size: .68rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; }
+.tag.warn { background: #fde8e6; color: #9c2a20; } .tag.ok { background: #e5f2ec; color: #22603f; } .tag.new { background: #fff0e0; color: #8a4500; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tag.warn { background: #3a1d1b; color: #ffb4ab; } :root:not([data-theme="light"]) .tag.ok { background: #14261e; color: #8fd6b0; } :root:not([data-theme="light"]) .tag.new { background: #2c1f12; color: #ffc48a; } }
+:root[data-theme="dark"] .tag.warn { background: #3a1d1b; color: #ffb4ab; } :root[data-theme="dark"] .tag.ok { background: #14261e; color: #8fd6b0; } :root[data-theme="dark"] .tag.new { background: #2c1f12; color: #ffc48a; }
+
+/* ---------- Tables ---------- */
+.tbl { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: .86rem; }
+.tbl th, .tbl td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl th { background: var(--surface-2); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.tbl tr:last-child td { border-bottom: 0; }
+.scroll { overflow-x: auto; }
+.issues li { margin: 4px 0; }
+footer { margin-top: 40px; color: var(--muted); font-size: .8rem; }
+.toggle { float: right; border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: .8rem; }
+
+@media (max-width: 980px) {
+  .cols { grid-template-columns: 1fr; gap: 6px; }
+  svg#wires { display: none; }
+  .stackhint { display: block; }
+  .pages { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <button class="toggle" id="themeBtn" type="button">Toggle theme</button>
+  <h1>Léman Wealth Management: app map</h1>
+  <p>How the QARM II Streamlit app is wired: each page, its inputs, what it shows, and the data and functions behind it.
+  This map describes the <b>root app</b> (<code>streamlit/streamlit_app.py</code>) as it is on <code>main</code> on 24 Nov 2026.
+  Differences in the redesigned copy (<code>Qarm-ERC-22/</code>) are listed at the end.</p>
+  <div class="meta">
+    <span class="chip">Entry <b>streamlit/streamlit_app.py</b></span>
+    <span class="chip">Navigation <b>top bar, 6 pages, no sidebar</b></span>
+    <span class="chip">Data <b>2004-01-01 → 2026-11-16, daily, USD</b></span>
+    <span class="chip">Portfolio start <b>2005-01-01, monthly rebalancing</b></span>
+    <span class="chip">Risk window <b>252 days, Ledoit-Wolf for 30+ assets</b></span>
+  </div>
+</header>
+
+<h2>1 · Data flow</h2>
+<p class="sub">Offline pipeline on the left (run once with <code>python compute_erc.py</code>, about 2 min); the app only reads <code>data/processed/</code>.
+The ERC Portfolio page also solves a live ERC on the investor's screened universe.</p>
+
+<div class="flow" id="flow">
+  <svg id="wires" aria-hidden="true"><defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--arrow)"/></marker>
+    <marker id="ahs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+    <marker id="ahl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--svc)"/></marker>
+  </defs></svg>
+  <div class="cols">
+    <div class="col">
+      <h3>Raw · data/raw/</h3>
+      <div class="node raw" id="r-eq"><b>Equity constituents</b><span class="mono">LS&amp;PCOMP, LMSEMUID, LMSPACFD, LMSEMAFD</span></div>
+      <div class="node raw" id="r-esg"><b>ICB sector + ESG score</b><span class="mono">*-ICB-ESG.xlsx (4 files)</span></div>
+      <div class="node raw" id="r-ba"><b>Bonds · commodities</b><span class="mono">UAGG · GSENTOT, GSPMTOT, GSAGTOT</span></div>
+      <div class="node raw" id="r-bm"><b>Benchmarks</b><span class="mono">S&amp;PCOMP, MSEMUI$, MSPACF$, MSEMAF$, GSCITOT</span></div>
+      <div class="node raw" id="r-rf"><b>Risk-free</b><span class="mono">TRUS1MT (1-month T-bill)</span></div>
+    </div>
+    <div class="stackhint">↓</div>
+    <div class="col">
+      <h3>Pipeline · compute_erc.py</h3>
+      <div class="node pipe" id="p-load"><b>load_all()</b><span class="mono">importation_data: load_constituents, load_esg, clean_prices (min price, stale ends, spikes, ffill ≤5)</span></div>
+      <div class="node pipe" id="p-layer"><b>build_data_layer()</b><span class="mono">utilities: simple_returns (D, M), rolling_volatility (252d)</span></div>
+      <div class="node pipe" id="p-port"><b>run_portfolios()</b><span class="mono">backtest(two_level_weights) for ERC; esg_risk_budgets → ESG; ERC per sleeve; 60/40 and 1/N</span></div>
+      <div class="node pipe" id="p-perf"><b>Metrics</b><span class="mono">performance_metrics (return, vol, Sharpe, MDD, VaR/ES), period_performance (2008, 2020, 2022)</span></div>
+    </div>
+    <div class="stackhint">↓</div>
+    <div class="col">
+      <h3>Processed · data/processed/</h3>
+      <div class="node proc" id="d-univ"><b>esg_universe.parquet</b><span class="mono">stock, zone, country, industry, ESG score, eligible_at_start</span></div>
+      <div class="node proc" id="d-series"><b>Per asset class (9 groups)</b><span class="mono">prices_*, simple_returns_daily_*, simple_returns_monthly_*, volatility_*</span></div>
+      <div class="node proc" id="d-bt"><b>Backtest outputs</b><span class="mono">portfolio_returns.parquet, weights_*, sleeve_weights_*, turnover_*</span></div>
+      <div class="node proc" id="d-met"><b>Reports</b><span class="mono">performance_metrics.csv, crisis_performance.csv, data_quality_report.csv, rf.parquet</span></div>
+    </div>
+    <div class="stackhint">↓</div>
+    <div class="col">
+      <h3>App logic · services.py + core</h3>
+      <div class="node svc" id="s-load"><b>Cached loaders</b><span class="mono">load_universe, load_series_names, load_data_window</span></div>
+      <div class="node svc" id="s-screen"><b>Screening</b><span class="mono">validate_preferences → cached_screening → core.esg.investor_selection → screen_universe</span></div>
+      <div class="node svc state" id="s-state"><b>st.session_state</b><span class="mono">investor_prefs, screening_result (selected stocks, funnel, warnings, effective ESG cut)</span></div>
+      <div class="node svc" id="s-erc"><b>Live ERC (portfolio.py)</b><span class="mono">load_returns → estimation_window → core.erc_portfolio.build_erc_portfolio (covariance_matrix, risk_budget_weights, risk_contributions)</span></div>
+      <div class="node svc" id="s-ref"><b>reference_backtest()</b><span class="mono">reads the pre-computed returns and metrics</span></div>
+    </div>
+    <div class="stackhint">↓</div>
+    <div class="col">
+      <h3>Pages · top navigation</h3>
+      <div class="node pg" id="g-home"><b>Home</b><span class="mono">home_page.py</span></div>
+      <div class="node pg" id="g-pref"><b>Investor Preferences</b><span class="mono">investor_preferences.py</span></div>
+      <div class="node pg" id="g-exp"><b>Universe Explorer</b><span class="mono">universe_explorer.py</span></div>
+      <div class="node pg" id="g-erc"><b>ERC Portfolio</b><span class="mono">portfolio.py</span></div>
+      <div class="node pg" id="g-meth"><b>Methodology</b><span class="mono">methodology.py (static text)</span></div>
+      <div class="node pg" id="g-team"><b>About us</b><span class="mono">team.py (static, photos)</span></div>
+    </div>
+  </div>
+  <div class="legend"><span>reads / writes</span><span class="l-session">session state between pages</span><span class="l-live">live computation in the browser session</span></div>
+</div>
+
+<h2>2 · Pages</h2>
+<p class="sub">There is no sidebar any more: the inputs sit inside each page. <span style="color:var(--accent)">Inputs</span>, <span style="color:var(--navy)">displays</span>, <span style="color:var(--green)">data and functions</span>.</p>
+
+<div class="pages">
+  <div class="card">
+    <h3>Home</h3><div class="file">streamlit/home_page.py</div>
+    <p class="role">Mandate, how to use the app, data coverage and roadmap.</p>
+    <h4 class="in">Inputs</h4>
+    <ul><li>None (link button “Start with Investor Preferences”)</li></ul>
+    <h4 class="out">Displays</h4>
+    <ul>
+      <li>Banner image <code>assets/leman_banner.png</code></li>
+      <li>4 metrics: equity universe, eligible at start, ESG coverage, bond &amp; commodity indices</li>
+      <li>Bar chart: stocks per zone (all constituents vs eligible)</li>
+      <li>Table: coverage per zone (stocks, eligible, ESG coverage, median ESG)</li>
+      <li>Table: benchmarks and status · list of non-equity sleeves</li>
+      <li>Roadmap badges <span class="tag warn">out of date</span></li>
+    </ul>
+    <h4 class="data">Data &amp; functions</h4>
+    <ul><li><code>load_universe</code> → esg_universe.parquet</li><li><code>load_series_names</code> → prices_bonds / commodities / benchmarks</li><li><code>coverage_by_zone</code>, <code>universe_totals</code>, <code>benchmark_status</code></li></ul>
+  </div>
+
+  <div class="card">
+    <h3>Investor Preferences</h3><div class="file">streamlit/investor_preferences.py</div>
+    <p class="role">Step 1: the investor's questionnaire; runs the ESG screen.</p>
+    <h4 class="in">Inputs</h4>
+    <ul>
+      <li>Region pills: US, Eurozone, Pacific, EM EMEA</li>
+      <li>Toggle “All industries” + multiselect of 11 ICB industries (with stock counts)</li>
+      <li>Select slider “ESG ambition”: None / Low / Medium / High / Very high (0 / 0.25 / 0.5 / 0.75 / 0.9 percentile)</li>
+      <li>Toggle “Eligible at portfolio start only (2005-01-01)”</li>
+      <li>Buttons: Screen universe, Reset</li>
+    </ul>
+    <h4 class="out">Displays</h4>
+    <ul>
+      <li>“Your selection” card: stocks in scope, eligible, summary of answers, validation errors</li>
+      <li>Result metrics: in scope → eligible → screened candidates → ESG-selected</li>
+      <li>Warnings when the ESG cut was relaxed · table of requested vs effective cut per zone</li>
+    </ul>
+    <h4 class="data">Data &amp; functions</h4>
+    <ul><li><code>validate_preferences</code>, <code>industry_counts</code>, <code>missing_industries_by_zone</code></li><li><code>cached_screening</code> → <code>run_screening</code> → <code>core.esg.investor_selection</code> (best-in-class within zone × industry, relaxed by 0.05 if fewer than 10 stocks)</li><li>Writes <code>session_state["screening_result"]</code></li></ul>
+  </div>
+
+  <div class="card">
+    <h3>Universe Explorer</h3><div class="file">streamlit/universe_explorer.py</div>
+    <p class="role">Step 2: inspect the screened stocks before they are weighted.</p>
+    <h4 class="in">Inputs</h4>
+    <ul><li>Text search “Search for a company”</li><li>Multiselect “Filter by region”</li><li>Download button (CSV)</li></ul>
+    <h4 class="out">Displays</h4>
+    <ul>
+      <li>4 metrics: in scope, eligible, selected, ESG ambition</li>
+      <li>Bar charts: stocks by region and by industry</li>
+      <li>ESG metrics (mean, median, coverage) + histogram of ESG scores</li>
+      <li>Expander: screening warnings + effective ESG cut</li>
+      <li>Table of selected companies (company, region, country, industry, sector, ESG, ISIN)</li>
+    </ul>
+    <h4 class="data">Data &amp; functions</h4>
+    <ul><li>Reads only <code>session_state["screening_result"]</code>; without it, shows “apply your preferences first”</li></ul>
+  </div>
+
+  <div class="card">
+    <h3>ERC Portfolio</h3><div class="file">streamlit/portfolio.py</div>
+    <p class="role">Step 3: two-level ERC on the screened universe at the latest monthly rebalancing date, plus the historical backtest.</p>
+    <h4 class="in">Inputs</h4>
+    <ul>
+      <li>Radio: “Equal risk contribution (ERC)” vs “ESG-tilted risk budgets”</li>
+      <li>Selectbox “Sleeve” (Risk contributions tab)</li>
+      <li>Multiselect “Sleeves” + text search + CSV download (Holdings tab)</li>
+      <li>Universe from the Preferences page; default = all regions, Medium ESG</li>
+    </ul>
+    <h4 class="out">Displays</h4>
+    <ul>
+      <li>4 metrics: portfolio volatility, assets held, equity share, risk-contribution check</li>
+      <li><b>Allocation</b>: donut by sleeve, sleeve table (weight, risk contribution, volatility), top-15 positions</li>
+      <li><b>Risk contributions</b>: weight vs risk contribution by sleeve (target 1/N) and inside a sleeve</li>
+      <li><b>ERC vs Equal Weight</b>: volatility table EW / ERC / Min-Variance + risk-contribution bars</li>
+      <li><b>Holdings</b>: per-asset weight, share of risk, volatility, ESG</li>
+      <li><b>Historical backtest</b>: growth of 100 (log scale), drawdowns, metrics table for ERC, ESG, 60/40, 1/N</li>
+    </ul>
+    <h4 class="data">Data &amp; functions</h4>
+    <ul><li><code>read_processed("returns_daily", …)</code> per zone + bonds + commodities</li><li><code>estimation_window</code> → <code>build_erc_portfolio</code> (<code>covariance_matrix</code>, <code>risk_budget_weights</code>, <code>risk_contributions</code>, <code>_min_variance</code>)</li><li><code>reference_backtest</code> → portfolio_returns.parquet, performance_metrics.csv; <code>drawdown</code></li><li>crisis_performance.csv and sleeve_weights_erc are loaded but <span class="tag warn">not shown</span></li></ul>
+  </div>
+
+  <div class="card">
+    <h3>Methodology</h3><div class="file">streamlit/methodology.py</div>
+    <p class="role">The method in plain language: equal risk, not equal capital; 4 steps; data, ESG screen, risk estimation, limitations.</p>
+    <h4 class="in">Inputs</h4><ul><li>None</li></ul>
+    <h4 class="out">Displays</h4><ul><li>Static HTML cards and lists</li></ul>
+    <h4 class="data">Data &amp; functions</h4><ul><li><code>load_data_window</code>, <code>ESTIMATION_WINDOW</code></li></ul>
+  </div>
+
+  <div class="card">
+    <h3>About us</h3><div class="file">streamlit/team.py</div>
+    <p class="role">Team presentation (6 members, roles, skills, LinkedIn links).</p>
+    <h4 class="in">Inputs</h4><ul><li>None</li></ul>
+    <h4 class="out">Displays</h4><ul><li>Hero banner + member cards (photos from <code>assets/</code> if found, initials otherwise)</li></ul>
+    <h4 class="data">Data &amp; functions</h4><ul><li>No market data</li></ul>
+  </div>
+</div>
+
+<h2>3 · Backtest results the app shows (2005 → 2026)</h2>
+<p class="sub">From <code>data/processed/performance_metrics.csv</code>, before costs.</p>
+<div class="scroll">
+<table class="tbl">
+  <thead><tr><th>Portfolio</th><th>Ann. return</th><th>Ann. volatility</th><th>Sharpe</th><th>Max drawdown</th></tr></thead>
+  <tbody>
+    <tr><td><b>ERC</b> (two-level, 6 sleeves)</td><td>7.5%</td><td>6.4%</td><td>0.89</td><td>−27.3%</td></tr>
+    <tr><td><b>ESG</b> (ESG risk budgets)</td><td>7.3%</td><td>6.4%</td><td>0.86</td><td>−27.5%</td></tr>
+    <tr><td>60/40 (S&amp;P 500 / AGG)</td><td>7.5%</td><td>11.2%</td><td>0.55</td><td>−35.8%</td></tr>
+    <tr><td>1/N (6 sleeve indices)</td><td>5.7%</td><td>12.6%</td><td>0.36</td><td>−51.9%</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>4 · Redesigned copy: Qarm-ERC-22/</h2>
+<p class="sub">A complete, self-contained second copy of the project (data, core, app, tests; 214 MB) with the “Amber” design. Run it from inside that folder.</p>
+<div class="scroll">
+<table class="tbl">
+  <thead><tr><th>Area</th><th>Root app</th><th>Qarm-ERC-22 (on main)</th><th>Branch remove-esg-webapp (not merged)</th></tr></thead>
+  <tbody>
+    <tr><td>Navigation</td><td>Streamlit top nav, logo</td><td>Custom navbar with an “Investors” dropdown, light/dark switch, centred footer</td><td>New Home design</td></tr>
+    <tr><td>Preferences</td><td>4 steps</td><td><span class="tag new">new</span> step “Asset classes”: bonds always held, commodities toggle (5 or 6 risk blocks)</td><td>Reworked questionnaire, ESG removed from the app</td></tr>
+    <tr><td>ERC Portfolio</td><td>Always 6 sleeves</td><td>Without commodities the ERC runs on 5 sleeves; backtest switches to the “ex Commodities” series</td><td>ESG option removed</td></tr>
+    <tr><td>Universe Explorer</td><td>Basic table</td><td>Same content, new styling</td><td>Professional companies table (volatility bar, country names, tooltips)</td></tr>
+    <tr><td>Pipeline</td><td>ERC, ESG, per-sleeve, 60/40, 1/N</td><td>Adds ERC/ESG/1/N “ex Commodities” backtests</td><td>None</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>5 · Technical status (checked 24 Nov 2026)</h2>
+<ul class="issues">
+  <li><span class="tag ok">ok</span> Both apps start and every page loads without an exception; the Preferences → Explorer → Portfolio flow works (default screen: 396 stocks selected, 398 assets held, portfolio volatility 5.1%).</li>
+  <li><span class="tag warn">tests</span> <code>tests/test_webapp.py</code>: 6 of 15 fail in both copies; they still expect the old six zones (Europe, Oceania…) and “MSCI Pacific = Planned”. <code>tests/test_core.py</code> was deleted on 18 Nov, so <code>core/</code> has no tests in the root copy.</li>
+  <li><span class="tag warn">text</span> Stale text from before the ERC existed: Home roadmap (“In development · ERC &amp; backtesting”, “no portfolio weights shown”), Preferences caption (“Six investor zones… Asia and Oceania”), Explorer (“portfolio weights have not yet been calculated”), eligibility caption (95% vs 100% in config).</li>
+  <li><span class="tag warn">lint</span> Unused imports: <code>TRADING_DAYS</code> in core/erc_portfolio.py, <code>Path</code> in core/importation_data.py, <code>APP_NAME</code> and <code>page_header</code> in streamlit/home_page.py; an <code>if True:</code> block in portfolio.py; the erc_portfolio docstring mentions a missing <code>core.shrinkage</code> module.</li>
+  <li><span class="tag warn">repo</span> Two full copies of the app and the data (about 420 MB together) on main: decide which one Streamlit Cloud deploys and remove the other.</li>
+</ul>
+
+<footer>Generated from the code on main (commit 799ec47). Static page, no external resources.</footer>
+</div>
+
+<script>
+(function () {
+  var edges = [
+    ["r-eq","p-load"],["r-esg","p-load"],["r-ba","p-load"],["r-bm","p-load"],["r-rf","p-load"],
+    ["p-load","p-layer"],["p-layer","p-port"],["p-port","p-perf"],
+    ["p-layer","d-series"],["p-port","d-univ"],["p-port","d-bt"],["p-perf","d-met"],
+    ["d-univ","s-load"],["d-series","s-load"],["d-univ","s-screen"],["d-series","s-erc"],["d-bt","s-ref"],["d-met","s-ref"],
+    ["s-load","g-home"],["s-load","g-meth"],["s-screen","g-pref"],
+    ["g-pref","s-state","session"],["s-state","g-exp","session"],["s-state","g-erc","session"],
+    ["s-erc","g-erc","live"],["s-ref","g-erc"]
+  ];
+  var svg = document.getElementById("wires"), flow = document.getElementById("flow");
+  var NS = "http://www.w3.org/2000/svg";
+  function draw() {
+    Array.prototype.slice.call(svg.querySelectorAll("path.w")).forEach(function (p) { p.remove(); });
+    if (getComputedStyle(svg).display === "none") return;
+    var fr = flow.getBoundingClientRect();
+    edges.forEach(function (e) {
+      var a = document.getElementById(e[0]).getBoundingClientRect();
+      var b = document.getElementById(e[1]).getBoundingClientRect();
+      if (Math.abs(a.left - b.left) < 5) { // same column: short vertical arrow between the boxes
+        var xv = a.left + a.width / 2 - fr.left;
+        var pv = document.createElementNS(NS, "path");
+        pv.setAttribute("d", "M" + xv + "," + (a.bottom - fr.top) + " L" + xv + "," + (b.top - fr.top - 1));
+        pv.setAttribute("class", "w");
+        pv.setAttribute("marker-end", "url(#ah)");
+        svg.appendChild(pv);
+        return;
+      }
+      var back = b.left < a.left; // page -> state goes right-to-left
+      var x1 = (back ? a.left : a.right) - fr.left, y1 = a.top + a.height / 2 - fr.top;
+      var x2 = (back ? b.right : b.left) - fr.left - (back ? -2 : 2), y2 = b.top + b.height / 2 - fr.top;
+      var dx = Math.max(24, Math.abs(x2 - x1) / 2) * (back ? -1 : 1);
+      var p = document.createElementNS(NS, "path");
+      p.setAttribute("d", "M" + x1 + "," + y1 + " C" + (x1 + dx) + "," + y1 + " " + (x2 - dx) + "," + y2 + " " + x2 + "," + y2);
+      p.setAttribute("class", "w " + (e[2] || ""));
+      p.setAttribute("marker-end", e[2] === "session" ? "url(#ahs)" : e[2] === "live" ? "url(#ahl)" : "url(#ah)");
+      svg.appendChild(p);
+    });
+  }
+  window.addEventListener("resize", draw);
+  window.addEventListener("load", draw);
+  draw();
+  var btn = document.getElementById("themeBtn");
+  btn.addEventListener("click", function () {
+    var root = document.documentElement;
+    var dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    draw();
+  });
+})();
+</script>
+</body>
+</html>
