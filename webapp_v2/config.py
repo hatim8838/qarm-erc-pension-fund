@@ -35,26 +35,31 @@ PORTFOLIO_START = core_config.PORTFOLIO_START
 TRADING_DAYS = core_config.TRADING_DAYS
 RISK_FREE = "Risk-free"
 
-# Target volatility sigma* of the five risk levels, proposed from the ex-ante sigma of our
-# ERC portfolios (medians 2005-2026): full ERC with bonds 4.6%, Eurozone + bonds 4.0%,
-# equities + commodities 8.6%, equities only 9.2%. Level 3 sits at the full ERC, level 5 at
-# an all-equity ERC; without leverage a target above sigma_hat(x_erc) is capped (alpha = 1).
-TARGET_VOLS = {1: 0.03, 2: 0.04, 3: 0.05, 4: 0.07, 5: 0.09}
-MAX_ALPHA = 1.0  # no leverage: the risky share alpha = sigma* / sigma_hat(x_erc) is capped at 1
-VAR_LEVELS = (0.95, 0.99)
-TRANSACTION_COST_BPS = 10  # cost per unit of traded value (LN 3), adjustable with a slider
+# Risk level -> alpha = weight in the ERC portfolio x_erc; 1 - alpha earns the risk-free rate.
+# The mix is rebalanced back to alpha every month. alpha <= 1: no leverage.
+ALPHAS = {1: 0.20, 2: 0.40, 3: 0.60, 4: 0.80, 5: 1.00}
+DEFAULT_LEVEL = 3
+TRANSACTION_COST_BPS = 10  # cost per unit of traded value, adjustable with a slider
 MAX_COST_BPS = 50
 MIN_STOCKS_PER_SLEEVE = 10
-ESG_MODES = ("off", "screen", "screen_rb")
-ESG_SCREEN_LEVEL = 0.25  # screen = drop the worst 25% ESG scores within each region x sector
-RC_TOLERANCE = 1e-4  # max gap between RC*_i and its budget to call the solution exact
+# ESG screen: share X of the worst-ESG stocks excluded from each regional equity sleeve, at each
+# rebalancing, among the stocks investable on that date. Unscored stocks rank as the worst.
+ESG_LEVELS = {"Off": 0.0, "Low": 0.10, "Medium": 0.30, "High": 0.50}
+STRATEGY_ESG = "Medium"  # ESG level of the screened backtest shown on "Our strategy"
+ESG_SERIES = "ERC · ESG"  # its series name in the charts
+RC_TOLERANCE = 1e-4  # max gap between RC*_i and 1/n to call the ERC solution exact
 
-# Projection (LN 6 Gaussian assumption) and estimation error (LN 3)
+# Projection (log-normal) and estimation error of the expected return
 CI_Z = 1.96
 START_VALUE = 10_000
 FAN_PERCENTILES = (0.05, 0.25, 0.5, 0.75, 0.95)
-HORIZON_YEARS = (2, 5, 10, 20)  # default horizon for each answer to the horizon question
+DEFAULT_HORIZON = 10  # years, projection slider default
 MAX_HORIZON = 40
+
+# Composition views (3f tabs) and the universe explorer
+TOP_POSITIONS = 15  # largest holdings shown on the allocation tab
+TOP_INNER = 25  # assets shown inside a sleeve on the risk-contribution tab
+HIST_BINS = 20  # bins of the ESG score histogram
 
 # --------------------------------------------------------------------------- #
 # Look and feel
@@ -62,13 +67,15 @@ MAX_HORIZON = 40
 CSS_FILE = APP_DIR / "assets" / "style.css"
 LOGO_FILES = {"dark": APP_DIR / "assets" / "logo.svg", "light": APP_DIR / "assets" / "logo_light.svg"}
 HERO_PHOTO = APP_DIR / "assets" / "leman_hero.jpg"
-THEMES = {  # Streamlit theme options and chart colours of each mode
+THEMES = {  # Streamlit theme options and chart colours of each mode (weight / risk: light and dark bars)
     "dark": {"base": "dark", "primaryColor": "#7CC4FF", "backgroundColor": "#0B0D11",
-             "secondaryBackgroundColor": "#14171D", "textColor": "#E8ECF2", "grid": "rgba(255,255,255,0.07)"},
+             "secondaryBackgroundColor": "#14171D", "textColor": "#E8ECF2", "grid": "rgba(255,255,255,0.07)",
+             "weight": "#A9B6C8", "risk": "#2F6FC0"},
     "light": {"base": "light", "primaryColor": "#1F6FC5", "backgroundColor": "#F6F7F9",
-              "secondaryBackgroundColor": "#FFFFFF", "textColor": "#151A23", "grid": "rgba(0,0,0,0.07)"},
+              "secondaryBackgroundColor": "#FFFFFF", "textColor": "#151A23", "grid": "rgba(0,0,0,0.07)",
+              "weight": "#C9D0DA", "risk": "#1B365D"},
 }
-SERIES_COLORS = {"Your portfolio": "#7CC4FF", "ERC": "#7CC4FF", "ESG-RB": "#5ED3B6", "60/40": "#9AA5B8",
+SERIES_COLORS = {"Your portfolio": "#7CC4FF", "ERC": "#7CC4FF", ESG_SERIES: "#5ED3B6", "60/40": "#9AA5B8",
                  "1/N": "#5C6678", "EW": "#9AA5B8", RISK_FREE: "#3D4656"}
 PALETTE = ["#7CC4FF", "#4D8FD6", "#9B8CFF", "#5ED3B6", "#F2C66D", "#F08A6C", "#C77DD8", "#8FD694"]
 CHART_TRANSITION_MS = 600
@@ -76,8 +83,8 @@ CHART_TRANSITION_MS = 600
 PAGES = {  # navbar order; titles and icons are in content.NAV
     "who": "pages/who_we_are.py",
     "strategy": "pages/strategy.py",
+    "universe": "pages/universe_explorer.py",
     "journey": "pages/journey.py",
-    "implementation": "pages/implementation.py",
     "goals": "pages/goals.py",
 }
 PORT = 8503  # ``python run.py`` starts Streamlit on this port

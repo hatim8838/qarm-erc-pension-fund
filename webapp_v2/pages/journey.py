@@ -6,14 +6,14 @@ import streamlit as st
 
 import config as cfg
 import content
-from logic import data, journey, universe
+from logic import data, journey, portfolio, universe
 from pages import journey_portfolio, journey_steps
 from ui import blocks
 
 # Choices are stored under plain keys (not widget keys) so they survive when a step's
 # widgets are not drawn; widgets copy their value here in on_change callbacks.
-DEFAULTS = {"step": "regions", "regions": [], "classes": [], "sectors": data.sectors(), "esg": "off",
-            "answers": {}, "cost": cfg.TRANSACTION_COST_BPS}
+DEFAULTS = {"step": "regions", "regions": [], "classes": [], "sectors": data.sectors(),
+            "esg": portfolio.NO_SCREEN, "level": cfg.DEFAULT_LEVEL, "cost": cfg.TRANSACTION_COST_BPS}
 RENDER = {"regions": journey_steps.regions, "classes": journey_steps.classes, "sectors": journey_steps.sectors,
           "esg": journey_steps.esg, "profile": journey_steps.profile_step, "portfolio": journey_portfolio.render}
 

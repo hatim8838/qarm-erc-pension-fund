@@ -1,11 +1,11 @@
-"""Client journey steps 3a-3e: regions, asset classes, sectors, ESG, risk profile."""
+"""Client journey steps 3a-3e: regions, asset classes, sectors, ESG screen, risk level."""
 
 import pandas as pd
 import streamlit as st
 
 import config as cfg
 import content
-from logic import data, performance, profile, universe
+from logic import data, journey, performance, portfolio, universe
 from ui import blocks, charts
 
 T, J, B = content.TEXT, content.JOURNEY, content.NAV_BUTTONS
@@ -63,43 +63,47 @@ def _save(key: str, widget: str) -> None:
 
 
 def sectors(values: dict) -> None:
-    """3c: sectors applied to every chosen region, with the stocks left in each."""
+    """3c: sectors applied to every chosen region, with the investable stocks left in each."""
     blocks.section(*J["sectors"])
     st.multiselect(J["sectors"][0], data.sectors(), default=values["sectors"], key="w_sectors",
                    on_change=_save, args=("sectors", "w_sectors"), label_visibility="collapsed")
-    counts = universe.stock_counts(values["regions"], tuple(st.session_state["sectors"]), "off")
-    blocks.figures([(blocks.count_up(n), T["stocks_left"].format(region=r)) for r, n in counts.items()])
+    sec = tuple(st.session_state["sectors"])
+    blocks.figures([(blocks.count_up(universe.counts(r, sec, values["esg"])["kept"]),
+                     T["stocks_left"].format(region=r)) for r in values["regions"]])
+
+
+def esg_label(level: str) -> str:
+    """Slider label of an ESG level, e.g. "Medium (30%)"."""
+    return f"{level} ({blocks.pct(cfg.ESG_LEVELS[level], 0)})"
 
 
 def esg(values: dict) -> None:
-    """3d: ESG off / screen / screen + ESG risk budgets, with the ESG score it buys."""
-    blocks.section(*J["esg"], lecture="LN 6")
-    options = list(cfg.ESG_MODES)
-    st.radio(J["esg"][0], options, index=options.index(values["esg"]), format_func=content.ESG_LABELS.get,
-             captions=[content.ESG_HELP[o] for o in options], key="w_esg", on_change=_save, args=("esg", "w_esg"),
-             label_visibility="collapsed")
-    mode, sec = st.session_state["esg"], tuple(values["sectors"])
-    screened, everyone = (universe.average_esg(values["regions"], sec, m) for m in (mode, "off"))
-    st.info(T["esg_score"].format(screened=f"{screened:.1f}", all=f"{everyone:.1f}"), icon=":material/eco:")
+    """3d: ESG screen slider, with the stocks excluded today and the ESG score it buys, live."""
+    blocks.section(*J["esg"])
+    st.select_slider(T["esg_level"], list(cfg.ESG_LEVELS), value=values["esg"], format_func=esg_label,
+                     key="w_esg", on_change=_save, args=("esg", "w_esg"), help=content.ESG_HELP)
+    counts = [universe.counts(r, tuple(values["sectors"]), values["esg"]) for r in values["regions"]]
+    items = [(blocks.count_up(sum(c["excluded"] for c in counts)), T["excluded"]),
+             (blocks.count_up(sum(c["kept"] for c in counts)), T["kept"])]
+    choices = journey.to_choices(values)
+    if journey.problem("esg", values) is None:
+        score, off = (universe.esg_score(portfolio.today(choices.but(esg=e, level=portfolio.FULL)))
+                      for e in (choices.esg, portfolio.NO_SCREEN))
+        items.append((blocks.count_up(score, 1), f'{T["esg_now"]} ({T["esg_delta"].format(delta=score - off)})'))
+    blocks.figures(items)
 
 
-def _save_answer(key: str, options: list[str]) -> None:
-    """Store the position of the chosen option (0 = most cautious)."""
-    st.session_state["answers"][key] = options.index(st.session_state[f"w_{key}"])
+def level_label(level: int) -> str:
+    """Slider label of a risk level, e.g. "3 · Balanced · α 60%"."""
+    alpha = blocks.pct(cfg.ALPHAS[level], 0)
+    return T["level_format"].format(level=level, name=content.LEVEL_NAMES[level], alpha=alpha)
 
 
 def profile_step(values: dict) -> None:
-    """3e: six questions -> score -> risk level -> target volatility σ*."""
-    blocks.section(J["profile"][0], J["profile"][1].format(n=len(content.QUESTIONS)))
-    answers, columns = values["answers"], st.columns(2)
-    for i, (key, question, options) in enumerate(content.QUESTIONS):
-        columns[i % 2].radio(question, options, index=answers.get(key), key=f"w_{key}", on_change=_save_answer,
-                             args=(key, options))
-    if profile.is_complete(answers):
-        lvl = profile.level(profile.score(answers))
-        st.success(T["level_result"].format(level=lvl, name=content.LEVEL_NAMES[lvl],
-                                            target=blocks.pct(cfg.TARGET_VOLS[lvl])), icon=":material/target:")
-    with st.expander(T["mapping"]):
-        st.write(T["mapping_body"].format(n=profile.max_points()))
-        st.table({f"{k} · {content.LEVEL_NAMES[k]}": blocks.pct(v) for k, v in cfg.TARGET_VOLS.items()})
-
+    """3e: one slider sets α, with the resulting split on one live line."""
+    blocks.section(*J["profile"])
+    st.select_slider(T["level_slider"], list(cfg.ALPHAS), value=values["level"], format_func=level_label,
+                     key="w_level", on_change=_save, args=("level", "w_level"))
+    alpha = cfg.ALPHAS[st.session_state["level"]]
+    st.markdown(T["level_line"].format(level=st.session_state["level"], alpha=blocks.pct(alpha, 0),
+                                       rf=blocks.pct(1 - alpha, 0)))

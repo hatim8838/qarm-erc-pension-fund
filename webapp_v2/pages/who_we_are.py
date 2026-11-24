@@ -23,12 +23,12 @@ def key_figures() -> None:
 
 blocks.hero("who", cfg.PAGES["journey"], photo=True)
 key_figures()
-blocks.cards([{"badge": "LN 5 · LN 6", "title": content.MANDATE[0], "body": content.MANDATE[1]}], columns=1)
-blocks.section(T["team"], content.COURSE)
+blocks.cards([{"title": content.MANDATE[0], "body": content.MANDATE[1]}], columns=1)
+blocks.section(T["team"])
 blocks.cards([{"avatar": m["name"][0], "kicker": m["role"], "title": m["name"], "body": m["bio"], "tags": m["tags"]}
               for m in content.TEAM])
 blocks.section(T["approach"])
-blocks.cards([{"badge": b, "title": t, "body": body} for b, t, body in content.APPROACH])
+blocks.cards([{"title": t, "body": body} for t, body in content.APPROACH])
 blocks.section(T["steps"])
 blocks.steps(T["three_steps"])
 blocks.section(T["faq"])

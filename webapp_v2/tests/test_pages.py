@@ -5,8 +5,7 @@ from conftest import profiles
 from streamlit.testing.v1 import AppTest
 
 import config as cfg
-import content
-from logic import data, journey, profile
+from logic import data, journey
 from logic.portfolio import client_sleeves
 
 TIMEOUT = 600
@@ -47,10 +46,9 @@ def walk(choices) -> AppTest:
     click_next(at)
     at.multiselect(key="w_sectors").set_value(list(choices.sectors)).run()
     click_next(at)
-    at.radio(key="w_esg").set_value(choices.esg).run()
+    at.select_slider(key="w_esg").set_value(choices.esg).run()
     click_next(at)
-    for key, _, options in content.QUESTIONS:
-        at.radio(key=f"w_{key}").set_value(options[profile.answers_for_level(choices.level)[key]]).run()
+    at.select_slider(key="w_level").set_value(choices.level).run()
     click_next(at)
     assert not at.exception, [e.value for e in at.exception]
     return at
@@ -61,7 +59,7 @@ def test_journey_builds_the_chosen_portfolio(name):
     """Each profile reaches 3f, and the session holds exactly the profile's choices."""
     expected = profiles()[name]
     at = walk(expected)
-    values = {k: at.session_state[k] for k in ("regions", "classes", "sectors", "esg", "answers")}
+    values = {k: at.session_state[k] for k in ("regions", "classes", "sectors", "esg", "level")}
     got = journey.to_choices(values)
     assert at.session_state["step"] == "portfolio"
     assert set(got.regions) == set(expected.regions) and got.esg == expected.esg and got.level == expected.level
@@ -75,4 +73,19 @@ def test_next_is_blocked_with_a_single_sleeve():
     at.button(key="regions_0").click().run()
     click_next(at)
     at.button(key=f"classes_{data.asset_classes().index(cfg.EQUITIES)}").click().run()
+    assert at.button(key="next").disabled and at.warning
+
+
+def test_next_is_blocked_when_the_esg_screen_leaves_too_few_stocks():
+    """Eurozone Health Care passes 3c, but the High screen leaves fewer than the minimum: 3d blocks Next."""
+    at = app()
+    at.switch_page(cfg.PAGES["journey"]).run()
+    at.button(key=f"regions_{data.regions().index('Eurozone')}").click().run()
+    click_next(at)
+    for i, _ in enumerate(data.asset_classes()):
+        at.button(key=f"classes_{i}").click().run()
+    click_next(at)
+    at.multiselect(key="w_sectors").set_value(["Health Care"]).run()
+    click_next(at)
+    at.select_slider(key="w_esg").set_value(list(cfg.ESG_LEVELS)[-1]).run()
     assert at.button(key="next").disabled and at.warning

@@ -30,7 +30,7 @@ h1, h2, h3 { font-family: var(--font); letter-spacing: -0.02em; color: var(--ink
 /* ---------- Motion ---------- */
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 .rise { animation: rise 0.7s var(--ease) both; animation-delay: calc(var(--i, 0) * 90ms); }
-.stPlotlyChart, [data-testid="stMetric"], [data-testid="stExpander"], .stDataFrame, [class*="st-key-flow_step"] {
+.stPlotlyChart, [data-testid="stMetric"], [data-testid="stExpander"], .stDataFrame {
   animation: rise 0.7s var(--ease) both; }
 /* Count-up: a registered integer property animated from 0 to --to (no JavaScript). */
 @property --n { syntax: "<integer>"; initial-value: 0; inherits: false; }
@@ -61,12 +61,10 @@ h1, h2, h3 { font-family: var(--font); letter-spacing: -0.02em; color: var(--ink
 .figure-value { display: block; font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 600; letter-spacing: -0.03em; color: var(--ink); }
 .figure > span:last-child { color: var(--muted); font-size: 0.9rem; }
 
-/* ---------- Sections, cards, badges ---------- */
+/* ---------- Sections and cards ---------- */
 .section { margin: 3rem 0 1rem; }
 .section h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 500; margin: 0; padding: 0; }
 .section p { color: var(--muted); margin: 0.4rem 0 0; }
-.badge { display: inline-block; vertical-align: middle; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
-  padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--glow); color: var(--ink); margin-bottom: 0.5rem; }
 .bento { display: grid; gap: 1rem; margin-bottom: 1rem; }
 .bento.cols-1 { grid-template-columns: 1fr; }
 .bento.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -107,11 +105,9 @@ h1, h2, h3 { font-family: var(--font); letter-spacing: -0.02em; color: var(--ink
 .stepper div b { display: block; font-size: 0.7rem; }
 .stepper .done { border-color: var(--glow); color: var(--ink); }
 .stepper .now { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-[class*="st-key-flow_step"] { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
-  padding: 0.8rem 1.2rem; max-width: 760px; margin: 0 auto; transition: transform 0.25s var(--ease); }
-[class*="st-key-flow_step"]:hover { transform: translateY(-3px); border-color: var(--glow); }
-.flow-arrow { width: 2px; height: 1.6rem; margin: 0 auto; background: linear-gradient(var(--accent), transparent);
-  animation: rise 0.6s var(--ease) both; animation-delay: calc(var(--i) * 120ms); }
+.insight { border-left: 3px solid var(--accent); background: var(--surface); padding: 0.9rem 1.1rem;
+  border-radius: var(--radius-sm); line-height: 1.55; margin: 0.6rem 0 1rem; }
+.insight b { color: var(--accent); font-weight: 600; }
 
 /* ---------- CTA band and footer ---------- */
 .st-key-cta_band { margin: 4rem 0 1rem; padding: 2.5rem; border-radius: var(--radius); border: 1px solid var(--line);

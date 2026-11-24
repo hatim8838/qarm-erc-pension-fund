@@ -1,4 +1,4 @@
-"""Expected return with its estimation error (LN 3) and a Gaussian / log-normal projection (LN 6)."""
+"""Expected return with its estimation error (LN 3) and a log-normal projection (LN 6)."""
 
 from __future__ import annotations
 
@@ -24,3 +24,4 @@ def fan(mu: float, sigma: float, horizon: int) -> pd.DataFrame:
     drift = np.log(cfg.START_VALUE) + (mu - sigma**2 / 2) * h
     spread = sigma * np.sqrt(h)
     return pd.DataFrame({p: np.exp(drift + norm.ppf(p) * spread) for p in cfg.FAN_PERCENTILES}, index=h)
+

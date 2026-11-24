@@ -1,28 +1,18 @@
-"""What the "Your portfolio" tabs show: breakdowns, risk tables and diversification, today."""
+"""Breakdowns of the client portfolio today, and the LN 5 comparison of EW, ERC and MV."""
 
 from __future__ import annotations
 
 import pandas as pd
 
 import config as cfg
-from core.config import BENCHMARK_6040
 from logic import data
-from logic.covariance import ledoit_wolf_cc
-from logic.diversification import diversification_ratio, measures
 from logic.portfolio import stock_weights
 from logic.risk import decomposition, min_variance, volatility
 
 
 def last_decision(result: dict) -> dict:
-    """Level-2 decision (x, Σ̂, α, σ̂) at the last rebalancing."""
+    """Level-2 decision (x, Σ̂, σ̂) at the last rebalancing."""
     return result["decisions"][max(result["decisions"])]
-
-
-def risk_table(result: dict) -> pd.DataFrame:
-    """LN 5 decomposition of y = αx + (1−α)r: the risk-free row has MR = RC = 0, and ΣRC_i = σ(y)."""
-    d = last_decision(result)
-    cov = d["cov"].reindex(index=d["weights"].index, columns=d["weights"].index).fillna(0.0)
-    return decomposition(d["weights"], cov)
 
 
 def by_class(result: dict) -> pd.Series:
@@ -56,27 +46,6 @@ def theorem_holds(result: dict, tol: float = 1e-8) -> pd.Series:
         sig = compare_ew_erc_mv(d["cov"], d["x"])["σ"]
         out[t] = sig["MV"] <= sig["ERC"] + tol and sig["ERC"] <= sig["EW"] + tol
     return pd.Series(out)
-
-
-def _sixty_forty_cov() -> tuple[pd.Series, pd.DataFrame]:
-    """60/40 weights and Σ̂ of its two legs on the last window (core's BENCHMARK_6040)."""
-    legs = {"US": data.benchmarks()[cfg.INDEX_LABELS["US"]],
-            "US Aggregate": data.sleeve_returns("Bonds").iloc[:, 0]}
-    window = pd.DataFrame(legs).dropna().tail(cfg.ESTIMATION_WINDOW)
-    return pd.Series(BENCHMARK_6040), ledoit_wolf_cc(window)
-
-
-def diversification_table(result: dict) -> pd.DataFrame:
-    """H*, Gini, I* on weights and on RC, and DR, for your risky x, EW and 60/40."""
-    d = last_decision(result)
-    w6040, cov6040 = _sixty_forty_cov()
-    cases = {"Your portfolio": (d["x"], d["cov"]), "EW": (pd.Series(1 / len(d["x"]), index=d["x"].index), d["cov"]),
-             "60/40": (w6040, cov6040)}
-    rows = {}
-    for name, (x, cov) in cases.items():
-        rc = decomposition(x, cov)["RC"]
-        rows[name] = {**measures(x, rc), "DR": diversification_ratio(x, cov)}
-    return pd.DataFrame(rows).T
 
 
 def holdings_count(result: dict) -> int:

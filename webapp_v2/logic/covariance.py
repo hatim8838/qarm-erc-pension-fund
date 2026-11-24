@@ -24,9 +24,9 @@ def shrinkage_intensity(x: np.ndarray, sample: np.ndarray, target: np.ndarray, r
     t = len(x)
     var, sd = np.diag(sample), np.sqrt(np.diag(sample))
     pi_mat = (x**2).T @ (x**2) / t - sample**2  # asymptotic variances of the sample covariances
-    theta = (x**3).T @ x / t - var[:, None] * sample
-    np.fill_diagonal(theta, 0.0)
-    rho = np.trace(pi_mat) + rho_bar * ((sd[None, :] / sd[:, None]) * theta).sum()
+    cross = (x**3).T @ x / t - var[:, None] * sample
+    np.fill_diagonal(cross, 0.0)
+    rho = np.trace(pi_mat) + rho_bar * ((sd[None, :] / sd[:, None]) * cross).sum()
     gamma = ((target - sample) ** 2).sum()  # misspecification of the target
     return float(np.clip((pi_mat.sum() - rho) / gamma / t, 0.0, 1.0)) if gamma > 0 else 1.0
 

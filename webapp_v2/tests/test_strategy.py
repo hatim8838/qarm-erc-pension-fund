@@ -1,4 +1,4 @@
-"""B) Strategy tests on our data: baseline, ERC/RB exactness, theorem, filters, vol targeting, choices, look-ahead."""
+"""B) Strategy tests on our data: baseline, ERC exactness, α mix, ESG screen, filters, choices, look-ahead."""
 
 import numpy as np
 import pandas as pd
@@ -7,13 +7,11 @@ from conftest import profiles
 
 import config as cfg
 from core.utilities import covariance_matrix
-from logic import data, performance, portfolio, projection, universe
+from logic import data, portfolio, projection, universe
 from logic.construction import level1
 from logic.covariance import ledoit_wolf_cc
 from logic.report import theorem_holds
-from logic.risk import decomposition
-
-VOL_TOLERANCE = 0.25  # realised σ within ±25% of σ* when σ* is reachable at ≥ 85% of rebalancings
+from logic.risk import decomposition, volatility
 
 
 def first_flat_window() -> pd.Timestamp:
@@ -45,29 +43,76 @@ def test_baseline_with_ln3_shrinkage_stays_close_to_core(built):
 
 
 @pytest.mark.parametrize("name", ["a", "b", "c", "baseline"])
-def test_level2_erc_weights_and_mix_at_every_rebalancing(built, name):
-    """Across sleeves: RC*_i = 1/n, x ≥ 0, α + (1 − α) = 1, and σ(mv) ≤ σ(erc) ≤ σ(ew)."""
-    for d in built[name]["decisions"].values():
+def test_erc_across_sleeves_and_alpha_mix_at_every_rebalancing(built, name):
+    """Level 2: RC*_i = 1/n, x ≥ 0, Σx = 1; mix: α of the level, risk-free 1 − α, weights ≥ 0, sum 1."""
+    result = built[name]
+    alpha = cfg.ALPHAS[result["choices"].level]
+    assert result["alpha"] == alpha
+    for d in result["decisions"].values():
         rc = decomposition(d["x"], d["cov"])["RC*"]
         assert np.allclose(rc, 1 / len(rc), atol=cfg.RC_TOLERANCE)
-        assert (d["weights"] >= -1e-12).all() and d["weights"].sum() == pytest.approx(1.0)
-        assert 0 <= d["alpha"] <= cfg.MAX_ALPHA
-    assert theorem_holds(built[name]).all()
+        assert (d["x"] >= 0).all() and d["x"].sum() == pytest.approx(1.0)
+    w = result["weights"]
+    assert (w >= 0).all().all() and np.allclose(w.sum(axis=1), 1.0)
+    assert np.allclose(w[cfg.RISK_FREE], 1 - alpha) and np.allclose(w.drop(columns=cfg.RISK_FREE).sum(axis=1), alpha)
+    assert theorem_holds(result).all()
 
 
-@pytest.mark.parametrize("sleeve, sectors, esg", [("Eurozone", tuple(data.sectors()), "off"),
-                                                   ("EM EMEA", tuple(data.sectors()), "screen_rb")])
-def test_level1_risk_budgets_hold_at_every_rebalancing(sleeve, sectors, esg):
-    """Inside a sleeve: RC*_i = 1/n (ERC) or RC*_i = b_i (ESG budgets) on that date's Σ̂."""
-    result = level1(sleeve, sectors, esg)
+@pytest.mark.parametrize("name", ["a", "b", "c"])
+def test_mix_scales_risk_ex_ante(built, name):
+    """σ(y) = α·σ(x_erc) on each date's Σ̂ (the risk-free asset has no risk)."""
+    alpha = built[name]["alpha"]
+    for d in built[name]["decisions"].values():
+        assert volatility(alpha * d["x"], d["cov"]) == pytest.approx(alpha * d["sigma_hat"])
+
+
+@pytest.mark.parametrize("sleeve, esg", [("Eurozone", "Off"), ("EM EMEA", "High")])
+def test_level1_erc_holds_at_every_rebalancing(sleeve, esg):
+    """Inside a sleeve: RC*_i = 1/n on that date's Σ̂, after the screen."""
+    result = level1(sleeve, tuple(data.sectors()), esg)
     returns = data.sleeve_returns(sleeve)
     for t, w in result["weights"].iterrows():
         w = w[w > 0]
-        if w.empty:
-            continue
-        rc = decomposition(w, ledoit_wolf_cc(returns.loc[:t, w.index].tail(cfg.ESTIMATION_WINDOW)))["RC*"]
-        budget = universe.esg_budgets(w.index) if esg == "screen_rb" else pd.Series(1 / len(w), index=w.index)
-        assert np.allclose(rc, budget / budget.sum(), atol=cfg.RC_TOLERANCE)
+        if not w.empty:
+            rc = decomposition(w, ledoit_wolf_cc(returns.loc[:t, w.index].tail(cfg.ESTIMATION_WINDOW)))["RC*"]
+            assert np.allclose(rc, 1 / len(w), atol=cfg.RC_TOLERANCE)
+
+
+@pytest.mark.parametrize("esg", list(cfg.ESG_LEVELS))
+@pytest.mark.parametrize("sleeve", ["US", "EM EMEA"])
+def test_esg_screen_excludes_exactly_the_worst_share(sleeve, esg):
+    """At every date: X·n ± 1 stocks excluded, all worse than every kept one, and none of them held."""
+    result = level1(sleeve, tuple(data.sectors()), esg)
+    scores = data.stocks()["esg_score"].fillna(-np.inf)
+    for t, (candidates, excluded) in result["screen"].items():
+        assert abs(len(excluded) - cfg.ESG_LEVELS[esg] * len(candidates)) <= 1
+        kept = candidates[~candidates.isin(excluded)]
+        if len(excluded) and len(kept):
+            assert scores[excluded].max() <= scores[kept].min()
+        assert (result["weights"].loc[t].reindex(excluded).fillna(0.0) == 0).all()
+
+
+def test_bonds_and_commodities_ignore_the_esg_screen(built):
+    """The ESG level only changes the regional equity sleeves."""
+    for name, sleeve in (("b", "Bonds"), ("c", "Commodities")):
+        assert built[name]["choices"].esg != portfolio.NO_SCREEN
+        pd.testing.assert_frame_equal(built[name]["level1"][sleeve]["weights"],
+                                      built["baseline"]["level1"][sleeve]["weights"])
+
+
+def test_esg_score_improves_with_the_level():
+    """Portfolio ESG score today rises with every step of the screen."""
+    scores = [universe.esg_score(portfolio.today(portfolio.baseline(e))) for e in cfg.ESG_LEVELS]
+    assert all(a < b for a, b in zip(scores, scores[1:]))
+
+
+@pytest.mark.parametrize("name", ["a", "b", "c"])
+def test_live_snapshot_equals_the_last_rebalancing(built, name):
+    """portfolio.today (shown live on 3d) = stock weights of the backtest at its last date, divided by α."""
+    result = built[name]
+    held = portfolio.stock_weights(result).drop(cfg.RISK_FREE, errors="ignore") / result["alpha"]
+    snapshot = portfolio.today(result["choices"].but(level=portfolio.FULL))
+    pd.testing.assert_series_equal(held.sort_index(), snapshot[snapshot > 0].sort_index(), check_names=False)
 
 
 def test_filters_leave_no_excluded_holding(built):
@@ -81,49 +126,30 @@ def test_filters_leave_no_excluded_holding(built):
     assert set(built["a"]["level1"]) == {"Eurozone", "Bonds"} and "Bonds" not in built["c"]["level1"]
 
 
-def test_esg_screen_removes_only_stocks_below_the_threshold():
-    """Kept stocks score ≥ the ESG_SCREEN_LEVEL quantile of their region x sector; removed ones are below."""
-    for region in data.regions():
-        table = data.stocks()[data.stocks()["zone"] == region]
-        kept = universe.selected_stocks(region, tuple(data.sectors()), "screen")
-        cut = table.groupby("industry")["esg_score"].transform(lambda s: s.quantile(cfg.ESG_SCREEN_LEVEL))
-        below = table["esg_score"] < cut
-        assert not below[kept].any()
-        assert (below | table["esg_score"].isna())[table.index.difference(kept)].all()
-
-
-def test_vol_targeting_hits_reachable_targets_and_caps_the_others(built):
-    """Reachable σ*: realised σ within VOL_TOLERANCE; unreachable: α = 1 (no leverage)."""
-    for name in ("a", "b", "c"):
-        result, target = built[name], profiles()[name].target()
-        sigma_hat = pd.Series({t: d["sigma_hat"] for t, d in result["decisions"].items()})
-        alpha = pd.Series({t: d["alpha"] for t, d in result["decisions"].items()})
-        assert (alpha[sigma_hat < target] == cfg.MAX_ALPHA).all()
-        if (sigma_hat >= target).mean() >= 0.85:
-            realised = performance.realised_volatility(result["returns"])
-            assert abs(realised / target - 1) < VOL_TOLERANCE
-
-
-@pytest.mark.parametrize("change", [dict(regions=("US", "Eurozone")), dict(classes=(cfg.EQUITIES,) + ("Bonds",)),
-                                    dict(sectors=("Industrials", "Technology")), dict(esg="screen_rb"), dict(level=1)])
+@pytest.mark.parametrize("change", [dict(regions=("US", "Eurozone")), dict(classes=(cfg.EQUITIES, "Bonds")),
+                                    dict(sectors=("Industrials", "Technology")), dict(esg="High"), dict(level=1)])
 def test_each_choice_changes_the_portfolio(built, change):
-    """Changing a region, class, sector, ESG option or risk level changes the weights."""
+    """Changing a region, class, sector, ESG level or risk level changes the weights."""
     other = portfolio.build(profiles()["b"].but(**change))
     assert not portfolio.stock_weights(other).equals(portfolio.stock_weights(built["b"]))
 
 
 def test_no_look_ahead(built, monkeypatch):
-    """A decision on date t is the same when the data stop at t."""
-    t = list(built["a"]["decisions"])[120]
+    """A decision on date t (screen included) is the same when the data stop at t."""
+    t = list(built["b"]["decisions"])[120]
     full_returns, full_rf = data.sleeve_returns, data.risk_free_daily
     monkeypatch.setattr(data, "sleeve_returns", lambda s: full_returns(s).loc[:t])
     monkeypatch.setattr(data, "risk_free_daily", lambda: full_rf().loc[:t])
-    level1.cache_clear()
+    caches = (level1, portfolio.erc_part)
+    for cache in caches:
+        cache.cache_clear()
     try:
-        truncated = portfolio.build(profiles()["a"])["decisions"][t]["weights"]
+        truncated = portfolio.build(profiles()["b"])
     finally:
-        level1.cache_clear()
-    pd.testing.assert_series_equal(truncated, built["a"]["decisions"][t]["weights"])
+        for cache in caches:
+            cache.cache_clear()
+    pd.testing.assert_series_equal(truncated["decisions"][t]["x"], built["b"]["decisions"][t]["x"])
+    pd.testing.assert_series_equal(truncated["weights"].loc[t], built["b"]["weights"].loc[t])
 
 
 def test_projection_percentiles_are_ordered_and_widen(built):

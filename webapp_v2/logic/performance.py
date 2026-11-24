@@ -1,4 +1,4 @@
-"""LN 2 performance (SR, TE, IR), drawdowns and crisis returns, reusing core's metrics."""
+"""LN 2 performance (SR, TE, IR) and wealth paths, reusing core's metrics."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 import config as cfg
-from core.utilities import drawdown, performance_metrics, period_performance
+from core.utilities import performance_metrics
 from logic import data
 
 
@@ -30,22 +30,6 @@ def relative(portfolio: pd.Series, benchmark: pd.Series) -> dict[str, float]:
     return {"tracking_error": te, "information_ratio": float(active.mean() * cfg.TRADING_DAYS / te)}
 
 
-def crisis_table(returns: pd.DataFrame) -> pd.DataFrame:
-    """Cumulative return of each series during each crisis of core.CRISIS_PERIODS."""
-    return period_performance(aligned(returns))
-
-
 def wealth(returns: pd.DataFrame) -> pd.DataFrame:
     """Value of 100 invested at the common start."""
     return 100 * (1 + aligned(returns)).cumprod()
-
-
-def drawdowns(returns: pd.DataFrame) -> pd.DataFrame:
-    """Drawdown of each series from its running peak."""
-    returns = aligned(returns)
-    return pd.DataFrame({name: drawdown(returns[name]) for name in returns})
-
-
-def realised_volatility(returns: pd.Series) -> float:
-    """Annualised realised σ of daily returns."""
-    return float(returns.std() * np.sqrt(cfg.TRADING_DAYS))

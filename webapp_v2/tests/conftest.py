@@ -13,14 +13,14 @@ from logic.portfolio import Choices  # noqa: E402
 
 
 def profiles() -> dict[str, Choices]:
-    """(a) level 1, Eurozone, equities + bonds; (b) level 3, 3 regions, all classes, 3 sectors, ESG screen;
-    (c) level 5, all regions, equities + commodities, ESG screen + risk budgets."""
+    """(a) level 1, Eurozone, equities + bonds, ESG off; (b) level 3, 3 regions, all classes, 3 sectors,
+    ESG Medium; (c) level 5, all regions, equities + commodities, ESG High."""
     bonds, commodities = data.other_classes()
     return {
-        "a": Choices(("Eurozone",), (cfg.EQUITIES, bonds), tuple(data.sectors()), "off", 1),
+        "a": Choices(("Eurozone",), (cfg.EQUITIES, bonds), tuple(data.sectors()), "Off", 1),
         "b": Choices(("US", "Eurozone", "Pacific"), tuple(data.asset_classes()),
-                     ("Health Care", "Industrials", "Technology"), "screen", 3),
-        "c": Choices(tuple(data.regions()), (cfg.EQUITIES, commodities), tuple(data.sectors()), "screen_rb", 5),
+                     ("Health Care", "Industrials", "Technology"), "Medium", 3),
+        "c": Choices(tuple(data.regions()), (cfg.EQUITIES, commodities), tuple(data.sectors()), "High", 5),
     }
 
 

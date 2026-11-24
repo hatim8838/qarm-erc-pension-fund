@@ -1,16 +1,20 @@
-"""The client's portfolio: choices -> sleeves -> two-level ERC/RB -> vol targeting -> backtest."""
+"""The client's portfolio: choices -> sleeves -> two-level ERC -> α mix with the risk-free asset -> backtest."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from functools import lru_cache
 
 import pandas as pd
 
 import config as cfg
-from core.utilities import backtest
-from logic import data
-from logic.construction import level1, level2
+from core.utilities import backtest, rebalancing_dates
+from logic import data, universe
+from logic.construction import level1, level2, screened_erc
 from logic.covariance import ledoit_wolf_cc
+
+FULL = max(cfg.ALPHAS)  # the risk level with α = 1: the ERC portfolio itself
+NO_SCREEN = next(iter(cfg.ESG_LEVELS))  # the "Off" ESG level (X = 0)
 
 
 @dataclass(frozen=True)
@@ -20,19 +24,19 @@ class Choices:
     regions: tuple[str, ...]
     classes: tuple[str, ...]
     sectors: tuple[str, ...]
-    esg: str = "off"
-    level: int | None = None  # risk level 1-5; None = fully invested (α = 1)
+    esg: str = NO_SCREEN  # key of config.ESG_LEVELS
+    level: int = FULL  # risk level, key of config.ALPHAS
 
-    def target(self) -> float | None:
-        """σ* of the risk level."""
-        return None if self.level is None else cfg.TARGET_VOLS[self.level]
+    def alpha(self) -> float:
+        """α of the risk level: weight of the ERC portfolio."""
+        return cfg.ALPHAS[self.level]
 
     def but(self, **changes) -> "Choices":
         """A copy with some choices changed."""
         return replace(self, **changes)
 
 
-def baseline(esg: str = "off") -> Choices:
+def baseline(esg: str = NO_SCREEN) -> Choices:
     """Every region, class and sector, fully invested: the house portfolio."""
     return Choices(tuple(data.regions()), tuple(data.asset_classes()), tuple(data.sectors()), esg)
 
@@ -45,36 +49,58 @@ def client_sleeves(choices: Choices) -> list[str]:
     return [s for s in data.sleeves() if s in held]
 
 
-def _level1_all(choices: Choices, covariance) -> dict[str, dict]:
-    """Level-1 results of each held sleeve (filters only matter for regional sleeves)."""
-    out = {}
-    for s in client_sleeves(choices):
-        regional = s in data.regions()
-        key = (choices.sectors, choices.esg) if regional else ((), "off")
-        out[s] = level1(s, *key, covariance=covariance)
-    return out
+def filters(choices: Choices, sleeve: str) -> tuple[tuple[str, ...], str]:
+    """(sectors, ESG level) applied to a sleeve: only the regional equity sleeves are filtered."""
+    return (choices.sectors, choices.esg) if sleeve in data.regions() else ((), NO_SCREEN)
 
 
-def build(choices: Choices, covariance=ledoit_wolf_cc) -> dict:
-    """Backtest of the client's portfolio (sleeves + risk-free) with every rebalancing decision."""
-    sleeves = _level1_all(choices, covariance)
+def _held_returns(sleeves: dict[str, dict]) -> pd.DataFrame:
+    """Daily returns of the held sleeves (level 1, with drift) and of the risk-free asset."""
     held = pd.DataFrame({s: r["returns"] for s, r in sleeves.items()})
     first = min(r["weights"].index[0] for r in sleeves.values())
     held = held.reindex(held.index.union([first]))  # the first decision date precedes the first return
     held[cfg.RISK_FREE] = data.risk_free_daily().reindex(held.index).ffill()
-    decisions = {}
+    return held
+
+
+@lru_cache(maxsize=16)
+def erc_part(choices: Choices, covariance=ledoit_wolf_cc) -> dict:
+    """The part that does not depend on α: level 1 of each sleeve and the level-2 x_erc at each date."""
+    sleeves = {s: level1(s, *filters(choices, s), covariance=covariance) for s in client_sleeves(choices)}
+    held = _held_returns(sleeves)
+    dates = rebalancing_dates(held.index, cfg.PORTFOLIO_START, cfg.REBALANCING_FREQ)
+    decisions = {t: level2(pd.DataFrame({s: r["windows"][t] for s, r in sleeves.items() if t in r["windows"]}),
+                           covariance) for t in dates}
+    return {"level1": sleeves, "held": held, "decisions": decisions}
+
+
+def build(choices: Choices, covariance=ledoit_wolf_cc) -> dict:
+    """Backtest of y = α·x_erc + (1 − α)·r, rebalanced monthly back to α (LN 2), with every decision."""
+    part, alpha = erc_part(choices.but(level=FULL), covariance), choices.alpha()
 
     def weight_fn(window: pd.DataFrame) -> pd.Series:
-        """Level 2 on the level-1 sleeve windows of the date (not on the realised window)."""
-        t = window.index[-1]
-        frame = pd.DataFrame({s: r["windows"][t] for s, r in sleeves.items() if t in r["windows"]})
-        decisions[t] = level2(frame, choices.target(), covariance)
-        return decisions[t]["weights"]
+        """α in the ERC sleeves, 1 − α in the risk-free asset."""
+        x = part["decisions"][window.index[-1]]["x"]
+        return pd.concat([alpha * x, pd.Series({cfg.RISK_FREE: 1.0 - alpha})])
 
-    result = backtest(held, weight_fn, cfg.PORTFOLIO_START, cfg.REBALANCING_FREQ)
-    result.update(decisions=decisions, level1=sleeves, choices=choices)
+    result = backtest(part["held"], weight_fn, cfg.PORTFOLIO_START, cfg.REBALANCING_FREQ)
+    result.update(decisions=part["decisions"], level1=part["level1"], choices=choices, alpha=alpha)
     result["total_turnover"] = total_turnover(result)
     return result
+
+
+@lru_cache(maxsize=64)
+def today(choices: Choices) -> pd.Series:
+    """Stock weights of the ERC portfolio (α = 1) at the last rebalancing, from the last windows only."""
+    inner = {}
+    for s in client_sleeves(choices):
+        sectors, esg = filters(choices, s)
+        window = universe.last_window(s, sectors)
+        w = screened_erc(window, esg)[0]
+        if not w.empty:
+            inner[s] = (w, window)
+    x = level2(pd.DataFrame({s: win[w.index] @ w for s, (w, win) in inner.items()}))["x"]
+    return pd.concat([x[s] * w for s, (w, _) in inner.items()])
 
 
 def total_turnover(result: dict) -> pd.Series:

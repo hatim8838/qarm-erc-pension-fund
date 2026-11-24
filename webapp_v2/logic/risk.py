@@ -1,13 +1,10 @@
-"""LN 5 / LN 6 risk analytics in course notation: σ(x), MR, RC, RC*, VaR, ES, minimum variance."""
+"""LN 5 risk analytics in course notation: σ(x), MR, RC, RC*, minimum variance."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
-from scipy.stats import norm
-
-import config as cfg
 
 
 def volatility(x: pd.Series, cov: pd.DataFrame) -> float:
@@ -34,32 +31,3 @@ def min_variance(cov: pd.DataFrame) -> pd.Series:
     w = np.clip(res.x, 0, None)
     return pd.Series(w / w.sum(), index=cov.index)
 
-
-def gaussian_var_es(mu: float, sigma: float, level: float) -> tuple[float, float]:
-    """LN 6 on losses L = −R: VaR_α = −μ + Φ⁻¹(α)σ, ES_α = −μ + σ·φ(Φ⁻¹(α))/(1−α)."""
-    z = norm.ppf(level)
-    return -mu + z * sigma, -mu + sigma * norm.pdf(z) / (1 - level)
-
-
-def historical_var_es(returns: pd.Series, level: float) -> tuple[float, float]:
-    """Historical VaR (loss quantile) and ES (mean loss beyond the VaR)."""
-    losses = -returns.dropna()
-    var = float(losses.quantile(level))
-    return var, float(losses[losses >= var].mean())
-
-
-def var_es_table(returns: pd.Series) -> pd.DataFrame:
-    """Daily Gaussian vs historical VaR and ES at every level in config.VAR_LEVELS."""
-    mu, sigma = returns.mean(), returns.std()
-    rows = {}
-    for level in cfg.VAR_LEVELS:
-        g_var, g_es = gaussian_var_es(mu, sigma, level)
-        h_var, h_es = historical_var_es(returns, level)
-        rows[f"{level:.0%}"] = {"Gaussian VaR": g_var, "Historical VaR": h_var,
-                                "Gaussian ES": g_es, "Historical ES": h_es}
-    return pd.DataFrame(rows).T
-
-
-def sharpe(mu: float, sigma: float, r: float) -> float:
-    """LN 2: SR(x | r) = (μ(x) − r)/σ(x)."""
-    return (mu - r) / sigma if sigma > 0 else float("nan")

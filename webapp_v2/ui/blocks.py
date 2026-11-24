@@ -1,4 +1,4 @@
-"""Reusable page blocks: hero, count-up figures, bento cards with LN badges, steps, FAQ, CTA, footer."""
+"""Reusable page blocks: hero, count-up figures, bento cards, steps, FAQ, CTA, insight box, method box, footer."""
 
 from __future__ import annotations
 
@@ -16,11 +16,6 @@ import content
 def pct(value: float, decimals: int = 1) -> str:
     """Percentage text, e.g. 0.0746 -> "7.5%"."""
     return "—" if math.isnan(value) else f"{value:.{decimals}%}"
-
-
-def badge(text: str) -> str:
-    """Small lecture badge, e.g. "LN 5"."""
-    return f'<span class="badge">{escape(text)}</span>'
 
 
 def count_up(value: float, decimals: int = 0, suffix: str = "") -> str:
@@ -59,21 +54,20 @@ def hero(key: str, cta_page: str | None = None, photo: bool = False) -> None:
         st.page_link(cta_page, label=cta, icon=":material/arrow_forward:")
 
 
-def section(title: str, subtitle: str = "", lecture: str = "") -> None:
-    """Section title with an optional subtitle and lecture badge."""
+def section(title: str, subtitle: str = "") -> None:
+    """Section title with an optional subtitle."""
     sub = f"<p>{escape(subtitle)}</p>" if subtitle else ""
-    st.html(f'<div class="section rise"><h2>{escape(title)} {badge(lecture) if lecture else ""}</h2>{sub}</div>')
+    st.html(f'<div class="section rise"><h2>{escape(title)}</h2>{sub}</div>')
 
 
 def cards(items: list[dict], columns: int = 3) -> None:
-    """Bento grid of cards: title, body, and optional badge / kicker / avatar / tags / list."""
+    """Bento grid of cards: title, body, and optional kicker / avatar / tags / list."""
     st.html(f'<div class="bento cols-{columns}">{"".join(_card(i, item) for i, item in enumerate(items))}</div>')
 
 
 def _card(index: int, item: dict) -> str:
     """HTML of one card (staggered entrance through --i)."""
     parts = [f'<div class="avatar">{escape(item["avatar"])}</div>' if item.get("avatar") else "",
-             badge(item["badge"]) if item.get("badge") else "",
              f'<p class="kicker">{escape(item["kicker"])}</p>' if item.get("kicker") else "",
              f'<h3>{escape(item["title"])}</h3><p>{escape(item.get("body", ""))}</p>']
     if item.get("list"):
@@ -109,9 +103,24 @@ def loader(text: str) -> str:
     return f'<div class="loader"><span></span><span></span><span></span><p>{escape(text)}</p></div>'
 
 
+def insight(html: str) -> None:
+    """Highlighted insight box; ``html`` comes from content.py templates filled with computed numbers."""
+    st.html(f'<div class="insight rise">{html}</div>')
+
+
+def method_box() -> None:
+    """Shared "Method and limitations" expander, filled from config (window, α range, ESG levels)."""
+    title, items = content.METHOD
+    alphas, levels = cfg.ALPHAS.values(), [v for v in cfg.ESG_LEVELS.values() if v > 0]
+    values = {"n": cfg.ESTIMATION_WINDOW, "low": pct(min(alphas), 0), "high": pct(max(alphas), 0),
+              "levels": "/".join(f"{100 * v:.0f}" for v in levels) + "%"}
+    with st.expander(title, icon=":material/info:"):
+        st.markdown("\n".join(f"- {item.format(**values)}" for item in items))
+
+
 def footer() -> None:
-    """Footer: brand, team, course, disclaimer and photo credit."""
+    """Footer: brand, team, disclaimer and photo credit."""
     team = " · ".join(m["name"] for m in content.TEAM)
     st.html(f'<footer class="site-footer"><strong>{escape(content.APP_NAME)}</strong><span>{escape(team)}</span>'
-            f"<span>{escape(content.COURSE)}</span><small>{escape(content.DISCLAIMER)}</small>"
+            f"<small>{escape(content.DISCLAIMER)}</small>"
             f"<small>{escape(content.PHOTO_CREDIT)}</small></footer>")

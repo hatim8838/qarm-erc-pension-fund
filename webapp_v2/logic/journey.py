@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import config as cfg
-from logic import profile, universe
+from logic import universe
 from logic.portfolio import Choices, client_sleeves
 
 STEPS = ("regions", "classes", "sectors", "esg", "profile", "portfolio")
@@ -18,10 +18,9 @@ def active_steps(classes) -> list[str]:
 
 
 def to_choices(state: dict) -> Choices:
-    """Choices from the session values (risk level only once the questionnaire is complete)."""
-    answers = state["answers"]
-    lvl = profile.level(profile.score(answers)) if profile.is_complete(answers) else None
-    return Choices(tuple(state["regions"]), tuple(state["classes"]), tuple(state["sectors"]), state["esg"], lvl)
+    """Choices from the session values."""
+    return Choices(tuple(state["regions"]), tuple(state["classes"]), tuple(state["sectors"]), state["esg"],
+                   state["level"])
 
 
 def problem(step: str, state: dict) -> str | None:
@@ -35,6 +34,4 @@ def problem(step: str, state: dict) -> str | None:
         return "no_sector"
     if step in STOCK_STEPS and universe.thin_regions(choices.regions, choices.sectors, choices.esg):
         return "thin_sleeve"
-    if step == "profile" and not profile.is_complete(state["answers"]):
-        return "questionnaire"
     return None

@@ -4,10 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from core.utilities import risk_budget_weights
+from core.utilities import erc_weights, risk_budget_weights
 from logic.covariance import _target, ledoit_wolf_cc, shrinkage_intensity
-from logic.diversification import herfindahl_star, shannon_star
-from logic.risk import decomposition, gaussian_var_es, sharpe, volatility
+from logic.risk import decomposition, volatility
 
 TOL = 1e-4  # 0.01 percentage point
 
@@ -30,7 +29,7 @@ def test_ln5_example2_risk_decomposition():
 
 def test_ln5_example4_erc_and_risk_budgeting():
     """ERC x = (19.69, 32.44, 47.87)%, σ = 16.13%; RB b = (50, 20, 30)%: x = (31.15, 21.90, 46.96)%, σ = 17.49%."""
-    erc = risk_budget_weights(ln5_cov())
+    erc = erc_weights(ln5_cov())
     assert np.allclose(erc, [0.1969, 0.3244, 0.4787], atol=TOL)
     assert volatility(erc, ln5_cov()) == pytest.approx(0.1613, abs=TOL)
     rb = risk_budget_weights(ln5_cov(), pd.Series([0.5, 0.2, 0.3]))
@@ -44,24 +43,8 @@ def test_ln5_lab_constant_correlation_erc_is_inverse_vol():
     vol = np.array([0.30, 0.25, 0.20, 0.15])
     corr = np.full((4, 4), 0.7)
     np.fill_diagonal(corr, 1.0)
-    x = risk_budget_weights(pd.DataFrame(np.outer(vol, vol) * corr))
+    x = erc_weights(pd.DataFrame(np.outer(vol, vol) * corr))
     assert np.allclose(x, (1 / vol) / (1 / vol).sum(), atol=TOL)
-
-
-def test_ln6_example8_gaussian_var_es():
-    """μ = 0, same portfolio as Example 2: VaR99 = 48.55%, ES99 = 55.62%."""
-    var, es = gaussian_var_es(0.0, volatility(pd.Series([0.5, 0.2, 0.3]), ln5_cov()), 0.99)
-    assert var == pytest.approx(0.4855, abs=TOL)
-    assert es == pytest.approx(0.5562, abs=TOL)
-
-
-def test_diversification_extremes():
-    """Equal weights: H* = 0 and I* = n; one asset: H* = 1."""
-    n = 5
-    equal = pd.Series(np.full(n, 1 / n))
-    assert herfindahl_star(equal) == pytest.approx(0.0)
-    assert shannon_star(equal) == pytest.approx(n)
-    assert herfindahl_star(pd.Series([1.0, 0, 0, 0, 0])) == pytest.approx(1.0)
 
 
 def test_ln2_mixing_with_the_risk_free_asset():
@@ -70,7 +53,7 @@ def test_ln2_mixing_with_the_risk_free_asset():
     mu_x, sigma_x = float(x @ mu), volatility(x, cov)
     mu_y, sigma_y = (1 - alpha) * r + alpha * mu_x, volatility(alpha * x, cov)
     assert sigma_y == pytest.approx(alpha * sigma_x)
-    assert sharpe(mu_y, sigma_y, r) == pytest.approx(sharpe(mu_x, sigma_x, r))
+    assert (mu_y - r) / sigma_y == pytest.approx((mu_x - r) / sigma_x)
 
 
 def test_ln3_shrinkage_matches_the_formula_term_by_term():
@@ -82,12 +65,12 @@ def test_ln3_shrinkage_matches_the_formula_term_by_term():
     s = x.T @ x / t
     f, rho_bar = _target(s)
     pi = sum(((x[:, i] * x[:, j] - s[i, j]) ** 2).mean() for i in range(n) for j in range(n))
-    def theta(i, j):
+    def cross_term(i, j):
         """θ_ii,ij of Ledoit and Wolf (2004)."""
         return ((x[:, i] ** 2 - s[i, i]) * (x[:, i] * x[:, j] - s[i, j])).mean()
 
     rho = sum(((x[:, i] ** 2 - s[i, i]) ** 2).mean() for i in range(n)) + sum(
-        rho_bar / 2 * (np.sqrt(s[j, j] / s[i, i]) * theta(i, j) + np.sqrt(s[i, i] / s[j, j]) * theta(j, i))
+        rho_bar / 2 * (np.sqrt(s[j, j] / s[i, i]) * cross_term(i, j) + np.sqrt(s[i, i] / s[j, j]) * cross_term(j, i))
         for i in range(n) for j in range(n) if i != j)
     delta = np.clip((pi - rho) / ((f - s) ** 2).sum() / t, 0, 1)
     assert shrinkage_intensity(x, s, f, rho_bar) == pytest.approx(delta)
