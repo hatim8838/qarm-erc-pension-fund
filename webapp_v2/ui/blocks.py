@@ -87,9 +87,16 @@ def lead(text: str, values: dict | None = None) -> None:
     st.html(f'<p class="prose-lead rise">{_fill(text, values or {})}</p>')
 
 
-def prose(title: str, paragraphs: list[str], values: dict | None = None) -> None:
+def _paragraph(item: str | tuple[str, str], values: dict) -> str:
+    """A paragraph, or (lead-in, text) with the lead-in in bold."""
+    if isinstance(item, tuple):
+        return f'<p><strong>{escape(item[0])}</strong> {_fill(item[1], values)}</p>'
+    return f"<p>{_fill(item, values)}</p>"
+
+
+def prose(title: str, paragraphs: list, values: dict | None = None) -> None:
     """Editorial section: heading on the left, flowing paragraphs on the right, thin divider above."""
-    body = "".join(f"<p>{_fill(p, values or {})}</p>" for p in paragraphs)
+    body = "".join(_paragraph(p, values or {}) for p in paragraphs)
     st.html(f'<section class="prose rise"><h2>{escape(title)}</h2><div>{body}</div></section>')
 
 

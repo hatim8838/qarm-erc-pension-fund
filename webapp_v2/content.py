@@ -19,7 +19,7 @@ HERO = {
     "strategy": ("Risk, shared fairly.", "Why we budget risk instead of forecasting returns.", "Find my portfolio"),
     "universe": ("Know what you own.", "Every stock we can invest in, by region, industry and ESG score.", None),
     "journey": ("Build it together.", "A few short steps from your preferences to your portfolio.", None),
-    "goals": ("Built for decades.", "What we aim for, what we commit to, and what comes next.", "Start the journey"),
+    "goals": ("Built for decades.", "What we aim for and what we commit to.", "Start the journey"),
 }
 
 TEAM = [
@@ -165,7 +165,6 @@ TEXT = {
                "of backtest: "
                "the estimation error of the mean, not the range of future returns.",
     "horizon": "Horizon (years)", "fan": "Value of {start} invested (median, 25–75% and 5–95% bands)",
-    "mission": "Mission", "commitments": "Our commitments", "next": "Next steps",
 }
 
 UNIVERSE = {
@@ -209,11 +208,41 @@ METHOD = ("Method and limitations", [
     "constituents and ESG scores are a recent snapshot. Educational project, not investment advice.",
 ])
 
-GOALS = {
-    "mission": "Give every pension client a portfolio whose risk is spread evenly across markets and whose "
-               "overall risk matches who they are.",
-    "commitments": ["No look-ahead: decisions use past data only", "The same rules for every client",
-                    "Transparent methods, explained on our strategy page", "Costs and limits shown openly"],
-    "next": ["Quarterly rebalancing as a robustness check", "Turnover limits between rebalancings",
-             "Dynamic ESG scores instead of today's snapshot", "Downloadable client reports"],
-}
+# "Our goals": opening paragraph, then editorial sections. A paragraph is a string, or (bold lead-in, text).
+GOALS_INTRO = ("Our goal is simple to state and hard to achieve: give every pension client a portfolio whose risk is "
+               "spread evenly across markets, and whose overall risk matches who they are.")
+GOALS = [
+    ("What we aim for", [
+        "A pension is built over decades, so the portfolio has to hold up in every kind of market, not only in the "
+        "good years. Spreading risk evenly across regions, bonds and commodities means that no single market can "
+        "decide the outcome on its own.",
+        "The other half of the goal is personal. Two savers can need very different levels of risk, depending on "
+        "their horizon and on how they live through a loss. That is why each client chooses their own risk level, "
+        "and why we review and adjust the portfolio every month as markets change.",
+    ]),
+    ("How we measure success", [
+        "Success, for a pension, is not beating the market every year. It is reaching retirement with savings "
+        "that grew steadily, without losses so deep that they force you to change your plans.",
+        "So we judge ourselves on what matters to you: risk that stays close to the level you chose, smaller "
+        "falls when markets are in trouble, and growth that builds up over the long run. We show these results "
+        "openly in your portfolio, next to a classic portfolio, so you can judge for yourself.",
+    ]),
+    ("Responsible investing", [
+        "You decide how much sustainability matters in your portfolio. With our ESG screen, the companies with the "
+        "weakest environmental, social and governance ratings in each region are left out before your portfolio "
+        "is built, and you choose how strict the screen is.",
+        "Your portfolio stays diversified whatever you choose: risk is still spread evenly over the companies that "
+        "remain, and you can see straight away how the screen changes your portfolio's ESG score.",
+    ]),
+    ("How we work with you", [
+        "Managing a pension fund's assets is a long-term mandate built on trust. This is what your fund can expect "
+        "from us.",
+        ("A mandate built around your rules.", "Together we set the regions, asset classes and sectors your fund "
+         "holds, the ESG screen and the level of risk it can bear. We then apply these choices the same way every "
+         "month."),
+        ("A disciplined process.", "Every decision follows the same written method, with no discretionary bets. "
+         "Your portfolio stays predictable and easy to explain to your board and your members."),
+        ("Full transparency.", "You see every holding, the share of risk each part of the portfolio carries, and "
+         "performance after trading costs, next to a classic 60/40 portfolio."),
+    ]),
+]
