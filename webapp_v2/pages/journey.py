@@ -13,7 +13,7 @@ from ui import blocks
 # Choices are stored under plain keys (not widget keys) so they survive when a step's
 # widgets are not drawn; widgets copy their value here in on_change callbacks.
 DEFAULTS = {"step": "regions", "regions": [], "classes": [], "sectors": data.sectors(),
-            "esg": portfolio.NO_SCREEN, "level": cfg.DEFAULT_LEVEL, "cost": cfg.TRANSACTION_COST_BPS}
+            "esg": portfolio.NO_SCREEN, "level": cfg.DEFAULT_LEVEL}
 RENDER = {"regions": journey_steps.regions, "classes": journey_steps.classes, "sectors": journey_steps.sectors,
           "esg": journey_steps.esg, "profile": journey_steps.profile_step, "portfolio": journey_portfolio.render}
 

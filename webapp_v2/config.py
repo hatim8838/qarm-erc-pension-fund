@@ -23,6 +23,7 @@ CORE_ERC = "ERC"  # core's two-level ERC backtest (the baseline to reproduce)
 CORE_SLEEVE_PREFIX = "ERC "  # core's level-1 ERC backtest of each sleeve: "ERC <sleeve>"
 COMPOSITE_BENCHMARKS = ["60/40", "1/N"]  # pre-computed in portfolio_returns.parquet
 INDEX_LABELS = core_config.BENCHMARK_LABELS  # benchmark file column -> index name
+BOND_INDEX = "AGG"  # index shown for the bond sleeve
 ASSET_ID_SEP = core_config.ASSET_ID_SEP
 EQUITIES = "Equities"  # asset-class label of the regional equity sleeves
 
@@ -39,14 +40,11 @@ RISK_FREE = "Risk-free"
 # The mix is rebalanced back to alpha every month. alpha <= 1: no leverage.
 ALPHAS = {1: 0.20, 2: 0.40, 3: 0.60, 4: 0.80, 5: 1.00}
 DEFAULT_LEVEL = 3
-TRANSACTION_COST_BPS = 10  # cost per unit of traded value, adjustable with a slider
-MAX_COST_BPS = 50
+TRANSACTION_COST_BPS = 10  # fixed cost per unit of traded value (institutional investor, liquid assets)
 MIN_STOCKS_PER_SLEEVE = 10
 # ESG screen: share X of the worst-ESG stocks excluded from each regional equity sleeve, at each
 # rebalancing, among the stocks investable on that date. Unscored stocks rank as the worst.
 ESG_LEVELS = {"Off": 0.0, "Low": 0.10, "Medium": 0.30, "High": 0.50}
-STRATEGY_ESG = "Medium"  # ESG level of the screened backtest shown on "Our strategy"
-ESG_SERIES = "ERC · ESG"  # its series name in the charts
 RC_TOLERANCE = 1e-4  # max gap between RC*_i and 1/n to call the ERC solution exact
 
 # Projection (log-normal) and estimation error of the expected return
@@ -75,8 +73,8 @@ THEMES = {  # Streamlit theme options and chart colours of each mode (weight / r
               "secondaryBackgroundColor": "#FFFFFF", "textColor": "#151A23", "grid": "rgba(0,0,0,0.07)",
               "weight": "#C9D0DA", "risk": "#1B365D"},
 }
-SERIES_COLORS = {"Your portfolio": "#7CC4FF", "ERC": "#7CC4FF", ESG_SERIES: "#5ED3B6", "60/40": "#9AA5B8",
-                 "1/N": "#5C6678", "EW": "#9AA5B8", RISK_FREE: "#3D4656"}
+# clearly different hues so that the lines can be told apart: blue = ours, coral = 60/40, amber = 1/N
+SERIES_COLORS = {"Your portfolio": "#7CC4FF", "ERC": "#7CC4FF", "60/40": "#F08A6C", "1/N": "#F2C66D", "EW": "#9AA5B8", RISK_FREE: "#3D4656"}
 PALETTE = ["#7CC4FF", "#4D8FD6", "#9B8CFF", "#5ED3B6", "#F2C66D", "#F08A6C", "#C77DD8", "#8FD694"]
 CHART_TRANSITION_MS = 600
 

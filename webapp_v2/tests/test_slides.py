@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import config as cfg
+
 from core.utilities import erc_weights, risk_budget_weights
 from logic.covariance import _target, ledoit_wolf_cc, shrinkage_intensity
 from logic.risk import decomposition, volatility
@@ -74,5 +76,5 @@ def test_ln3_shrinkage_matches_the_formula_term_by_term():
         for i in range(n) for j in range(n) if i != j)
     delta = np.clip((pi - rho) / ((f - s) ** 2).sum() / t, 0, 1)
     assert shrinkage_intensity(x, s, f, rho_bar) == pytest.approx(delta)
-    shrunk = ledoit_wolf_cc(pd.DataFrame(x)).to_numpy() / 252
+    shrunk = ledoit_wolf_cc(pd.DataFrame(x)).to_numpy() / cfg.TRADING_DAYS
     assert np.allclose(shrunk, delta * f + (1 - delta) * s)

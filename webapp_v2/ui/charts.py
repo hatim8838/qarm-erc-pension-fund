@@ -31,13 +31,16 @@ def show(fig: go.Figure, height: int = 360, percent_y: bool = False, key: str | 
     st.plotly_chart(fig, key=key, config={"displaylogo": False})
 
 
+LOG_TICKS = [25, 50, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000]
+
+
 def lines(df: pd.DataFrame, log_y: bool = False, percent_y: bool = False, height: int = 380, key=None) -> None:
-    """Time series with a date-range slider (zoom), one line per column."""
+    """Time series, one line per column. With ``log_y``, equal distances mean equal growth rates."""
     fig = go.Figure([go.Scatter(x=df.index, y=df[c], name=str(c), mode="lines",
                                 line=dict(color=_color(c, i), width=2)) for i, c in enumerate(df)])
-    fig.update_xaxes(rangeslider=dict(visible=True, thickness=0.06))
-    if log_y:
-        fig.update_yaxes(type="log")
+    if log_y:  # full numbers on the axis (100, 200, 500...) instead of plotly's abbreviated 2, 3, 4...
+        ticks = [v for v in LOG_TICKS if df.min().min() / 1.5 <= v <= df.max().max() * 1.5]
+        fig.update_yaxes(type="log", tickvals=ticks, ticktext=[f"{v:,}".replace(",", "'") for v in ticks])
     show(fig, height, percent_y, key)
 
 
@@ -71,10 +74,9 @@ def bars(df: pd.DataFrame, horizontal: bool = False, percent: bool = True, heigh
 
 
 def stacked_area(weights: pd.DataFrame, height: int = 340, key=None) -> None:
-    """Weights over time, stacked to 100%, with a date-range slider."""
+    """Weights over time, stacked to 100%."""
     fig = go.Figure([go.Scatter(x=weights.index, y=weights[c], name=str(c), stackgroup="w", mode="lines",
                                 line=dict(width=0.5, color=_color(c, i))) for i, c in enumerate(weights)])
-    fig.update_xaxes(rangeslider=dict(visible=True, thickness=0.06))
     show(fig, height, percent_y=True, key=key)
 
 

@@ -20,6 +20,7 @@ from core.config import (
     ICB_INDUSTRIES,
     PROCESSED_DIR,
     PROCESSED_FILES,
+    TRADING_DAYS,
     RAW_DIR,
     REGIONS,
     RISK_FREE,
@@ -117,10 +118,10 @@ def load_esg(region: str) -> pd.DataFrame:
 
 
 def load_risk_free(calendar: pd.DatetimeIndex) -> pd.DataFrame:
-    """Daily risk-free rate: ``rf_daily = TRUS1MT / 100 / 252`` (missing days filled)."""
+    """Daily risk-free rate: ``rf_daily = TRUS1MT / 100 / TRADING_DAYS`` (missing days filled)."""
     y = load_single_series(RISK_FREE, "yield_pct")
     y = y.reindex(y.index.union(calendar)).ffill().reindex(calendar)
-    return pd.DataFrame({"yield_pct": y, "rf_daily": (y / 100 / 252).fillna(0.0)})
+    return pd.DataFrame({"yield_pct": y, "rf_daily": (y / 100 / TRADING_DAYS).fillna(0.0)})
 
 
 # --------------------------------------------------------------------------- #

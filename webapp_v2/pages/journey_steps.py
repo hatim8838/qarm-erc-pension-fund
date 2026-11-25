@@ -31,20 +31,25 @@ def _pick_cards(key: str, items: list[str], facts: dict[str, str], chosen: list[
                       type="primary" if on else "secondary", width="stretch")
 
 
-def _sleeve_history() -> pd.DataFrame:
-    """Annual return and volatility of core's level-1 ERC portfolio of each sleeve."""
-    cols = {f"{cfg.CORE_SLEEVE_PREFIX}{s}": s for s in data.sleeves()}
-    return performance.metrics_table(data.portfolio_returns()[list(cols)].rename(columns=cols))
+def _index_chart(returns: pd.DataFrame, key: str, note: str) -> None:
+    """Annual return and volatility of official indices (no survivorship bias), one pair of bars each."""
+    table = performance.metrics_table(returns)[["ann_return", "ann_volatility"]]
+    charts.bars(table.rename(columns=content.METRIC_LABELS), key=key)
+    st.caption(T[note].format(start=returns.index[0].year))
 
 
 def regions(values: dict) -> None:
     """3a: regional equity sleeves as clickable cards."""
     blocks.section(*J["regions"])
-    table, history = data.stocks(), _sleeve_history()
-    facts = {r: T["region_facts"].format(n=(table["zone"] == r).sum(), c=table.loc[table["zone"] == r, "country"]
-                                         .nunique(), ret=blocks.pct(history.loc[r, "ann_return"]),
-                                         vol=blocks.pct(history.loc[r, "ann_volatility"])) for r in data.regions()}
+    table = data.stocks()
+    facts = {}
+    for r in data.regions():
+        n_countries = table.loc[table["zone"] == r, "country"].nunique()
+        facts[r] = T["region_facts"].format(n=(table["zone"] == r).sum(), c=n_countries,
+                                            countries="country" if n_countries == 1 else "countries")
     _pick_cards("regions", data.regions(), facts, values["regions"])
+    names = {cfg.INDEX_LABELS[r]: f"{r} ({cfg.INDEX_LABELS[r]})" for r in data.regions()}
+    _index_chart(data.index_returns()[list(names)].rename(columns=names), key="region_hist", note="index_note")
 
 
 def classes(values: dict) -> None:
@@ -52,9 +57,16 @@ def classes(values: dict) -> None:
     blocks.section(*J["classes"])
     facts = {c: content.CLASS_ROLES[c] for c in data.asset_classes()}
     _pick_cards("classes", data.asset_classes(), facts, values["classes"])
-    history = _sleeve_history()
-    st.caption(T["class_history"].format(start=data.portfolio_returns().index[0].year))
-    charts.bars(history[["ann_return", "ann_volatility"]].rename(columns=content.METRIC_LABELS), key="class_hist")
+    idx = data.index_returns()
+    chosen = values["regions"] or data.regions()  # equities = the regions picked in 3a, equal weights
+    bonds, commodities = data.other_classes()
+    classes_ = pd.DataFrame({
+        f"{cfg.EQUITIES} ({', '.join(chosen)})": idx[[cfg.INDEX_LABELS[r] for r in chosen]].mean(axis=1),
+        f"{bonds} ({cfg.BOND_INDEX})": idx[cfg.BOND_INDEX],
+        # our commodity sleeve is built from 3 S&P GSCI sector indices (no survivorship bias), so we show it directly
+        f"{commodities} (S&P GSCI energy, precious metals, agriculture)":
+            data.portfolio_returns()[f"{cfg.CORE_SLEEVE_PREFIX}{commodities}"].loc[idx.index[0]:]})
+    _index_chart(classes_.dropna(), key="class_hist", note="class_note")
 
 
 def _save(key: str, widget: str) -> None:

@@ -72,12 +72,13 @@ FAQ = [
 
 CLASS_ROLES = {
     "Equities": "Growth engine: the stocks of the regions you picked, ERC inside each region.",
-    "Bonds": "Stabiliser: US investment-grade bonds (Bloomberg US Aggregate).",
+    "Bonds": "Stabiliser: US investment-grade bonds (iShares AGG ETF, tracking the Bloomberg US Aggregate).",
     "Commodities": "Inflation hedge: energy, precious metals and agriculture (S&P GSCI sectors).",
 }
 METRIC_LABELS = {
-    "ann_return": "Annual return", "ann_volatility": "Volatility", "sharpe": "Sharpe ratio SR(x | r)",
-    "max_drawdown": "Max drawdown", "tracking_error": "Tracking error σ(x | b)", "information_ratio": "IR(x | b)",
+    "ann_return": "Annual return", "ann_volatility": "Volatility", "sharpe": "Sharpe ratio",
+    "max_drawdown": "Max drawdown", "tracking_error": "Tracking error vs benchmark",
+    "information_ratio": "Information ratio",
 }
 LEVEL_NAMES = {1: "Cautious", 2: "Moderate", 3: "Balanced", 4: "Dynamic", 5: "Aggressive"}
 ESG_HELP = "Share of the worst-ESG stocks excluded from each region, at every monthly rebalancing."
@@ -86,9 +87,11 @@ JOURNEY = {
     "regions": ("3a · Where do you want to invest?", "Pick one or more regional equity sleeves."),
     "classes": ("3b · Which asset classes?", "Each class is a sleeve of its own. Hold at least two sleeves."),
     "sectors": ("3c · Which sectors?", "Applied to the stocks of every region you picked."),
-    "esg": ("3d · ESG preference", "Exclude the worst ESG-rated stocks of each region before ERC runs."),
+    "esg": ("3d · ESG preference", "Exclude the worst ESG-rated stocks of each region before ERC runs: the ESG "
+                                    "screen decides what you own, ERC how the risk is spread."),
     "profile": ("3e · Your risk level", "Choose α, the share invested in the ERC portfolio; the rest earns the "
-                                        "risk-free rate."),
+                                        "risk-free rate. This scales risk (σ = α·σ_ERC) without changing the "
+                                        "mix, so the Sharpe ratio stays the same."),
     "portfolio": ("3f · Your portfolio", "{level} · α = {alpha} in ERC · ESG screen {esg} · {n} sleeves"),
 }
 STEP_NAMES = {"regions": "Regions", "classes": "Asset classes", "sectors": "Sectors", "esg": "ESG",
@@ -102,8 +105,10 @@ PROBLEMS = {
 NAV_BUTTONS = {"back": "Back", "next": "Next", "select": "Select", "selected": "Selected ✓"}
 
 TEXT = {
-    "region_facts": "{n} stocks · {c} countries · history: {ret} a year, σ = {vol}",
-    "class_history": "History of each sleeve since {start} (level-1 ERC portfolio of core).",
+    "region_facts": "{n} stocks · {c} {countries}",
+    "index_note": "Annual return and volatility of the official indices since {start}.",
+    "class_note": "Annual return and volatility since {start}: official indices for equities and bonds, our sleeve of "
+                  "three S&P GSCI sector indices for commodities.",
     "stocks_left": "stocks left in {region}",
     "team": "The team", "approach": "Our approach", "steps": "Three steps to your portfolio", "faq": "Questions",
     "who_figures": ["assets across {n} sleeves", "years of monthly rebalancing since {year}",
@@ -115,22 +120,31 @@ TEXT = {
     "why_rb": "Why risk budgeting", "lab": "EW vs ERC on our sleeves today",
     "lab_sub": "Risk contributions RC*_i of equal weights and of ERC on the same Ledoit-Wolf Σ̂ ({date}).",
     "theorem": "σ(x_mv) ≤ σ(x_erc) ≤ σ(x_ew) held at {share} of our {n} monthly rebalancings.",
-    "backtest": "The real backtest",
-    "backtest_sub": "All sleeves, fully invested, without and with the {esg} ESG screen ({share}), {start}–{end}, "
-                    "net of {bps} bps costs.",
-    "excluded": "stocks excluded today", "kept": "stocks kept", "esg_now": "Portfolio ESG score",
+    "excluded": "stocks excluded at the latest rebalancing", "kept": "stocks kept", "esg_now": "Portfolio ESG score",
     "esg_delta": "{delta:+.1f} vs Off", "esg_level": "ESG screen",
     "level_slider": "Risk level", "level_format": "{level} · {name} · α {alpha}",
     "level_line": "Level {level} · {alpha} in the ERC portfolio · {rf} risk-free",
-    "adjust": "Adjust my choices", "cost": "Transaction cost (bps of traded value)",
+    "adjust": "Adjust my choices",
+    "cost_note": "Trading costs are set at {bps} bps of the amount traded at each rebalancing, a typical level for "
+                 "an institutional investor in liquid markets. They reduce the annual return by {drag}.",
     "computed": "Recomputed in {s:.1f} s.", "cached": "Loaded from cache (first computed in {s:.1f} s).",
     "loading": "Budgeting the risk of your portfolio…",
     "tabs": ["Allocation", "Risk contribution", "Performance", "Projection"],
     "alpha": "ERC share α", "rf_share": "Risk-free 1 − α", "holdings": "Holdings", "esg_vs": "ESG score vs Off",
     "by_class": "By asset class", "by_sector": "Equities by sector",
     "benchmark": "Benchmark b", "gross_net": "Gross vs net of costs", "turnover": "Turnover at each rebalancing",
-    "weights_time": "Weights at each monthly rebalancing", "expected": "Expected annual return μ̂",
-    "ci_note": "± {margin} is the 95% interval of the estimate μ̂ ± 1.96·σ̂/√T over T = {years:.0f} years: "
+    "turnover_note": "Each bar is the share of the portfolio traded at a monthly rebalancing. It usually stays at a "
+                     "few percent and spikes only when volatility changes sharply: in the 2008 crisis, in March "
+                     "2020, and in 2021 when the Covid crash left the one-year estimation window.",
+    "weights_time": "Weights at each monthly rebalancing", "expected": "Expected annual return",
+    "expected_vol": "Expected volatility",
+    "bench_title": "{b} with your α = {alpha}",
+    "bench_note": "Fair comparison: the benchmark gets the same choice as you, α = {alpha} in the benchmark and "
+                  "{rf} in the risk-free asset. 60/40 = 60% S&P 500 + 40% US bonds (AGG); 1/N = equal weights on "
+                  "the six sleeve indices; both rebalanced monthly. Judge on the Sharpe ratio and the max drawdown: "
+                  "a riskier benchmark can end higher in a strong equity market.",
+    "ci_note": "± {margin} is the 95% interval of the estimated mean, μ ± 1.96·σ/√T, over T = {years:.0f} years "
+               "of backtest: "
                "the estimation error of the mean, not the range of future returns.",
     "horizon": "Horizon (years)", "fan": "Value of {start} invested (median, 25–75% and 5–95% bands)",
     "mission": "Mission", "commitments": "Our commitments", "next": "Next steps",

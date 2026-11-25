@@ -15,6 +15,11 @@ def aligned(returns: pd.DataFrame) -> pd.DataFrame:
     return returns.dropna()
 
 
+def with_alpha(returns: pd.Series, alpha: float, rf: pd.Series) -> pd.Series:
+    """α in the series and 1 − α in the risk-free asset (LN2), the client's own mix applied to a benchmark."""
+    return alpha * returns + (1 - alpha) * rf.reindex(returns.index).fillna(0.0)
+
+
 def metrics_table(returns: pd.DataFrame) -> pd.DataFrame:
     """Annual return μ, volatility σ, SR(x | r), max drawdown, historical VaR/ES (core)."""
     returns = aligned(returns)

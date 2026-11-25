@@ -65,6 +65,16 @@ def portfolio_returns() -> pd.DataFrame:
 
 
 @lru_cache(maxsize=1)
+def index_returns() -> pd.DataFrame:
+    """Daily returns of each sleeve's official index (no survivorship bias), from the portfolio start:
+    S&P 500, MSCI EMU, MSCI Pacific, MSCI EM EMEA, AGG (bonds) and S&P GSCI (commodities)."""
+    indices = read_processed("returns_daily", "benchmarks").rename(columns=cfg.INDEX_LABELS)
+    bonds = read_processed("returns_daily", "bonds").rename(columns={"US Aggregate": cfg.BOND_INDEX})
+    both = pd.concat([indices, bonds], axis=1)
+    return both.loc[portfolio_returns().index[0]:]
+
+
+@lru_cache(maxsize=1)
 def benchmarks() -> pd.DataFrame:
     """Benchmarks b: 60/40, 1/N and every index of the benchmark file, by display name."""
     indices = read_processed("returns_daily", "benchmarks").rename(columns=cfg.INDEX_LABELS)

@@ -32,7 +32,6 @@ def adjust_panel(values: dict) -> None:
                         key="adj_esg", on_change=_copy, args=("esg",), help=content.ESG_HELP)
         a.select_slider(T["level_slider"], list(cfg.ALPHAS), value=values["level"], format_func=level_label,
                         key="adj_level", on_change=_copy, args=("level",))
-        b.slider(T["cost"], 0, cfg.MAX_COST_BPS, value=values["cost"], key="adj_cost", on_change=_copy, args=("cost",))
 
 
 def first_problem(values: dict) -> str | None:

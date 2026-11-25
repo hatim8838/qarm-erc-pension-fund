@@ -11,12 +11,12 @@ PLAIN_COLUMNS = {"sharpe", "information_ratio"}  # ratios, not percentages
 def show(table: pd.DataFrame, labels: dict | None = None, plain: set[str] = frozenset()) -> None:
     """Dataframe with percent formatting, except ratio columns shown with two decimals."""
     labels = labels or {}
-    config = {}
+    shown = table.copy().astype(object)
     for col in table.columns:
-        is_plain = col in PLAIN_COLUMNS or col in plain
-        config[col] = st.column_config.NumberColumn(labels.get(col, str(col)),
-                                                    format="%.2f" if is_plain else "percent")
-    st.dataframe(table, column_config=config, width="stretch")
+        fmt = "{:.2f}" if col in PLAIN_COLUMNS or col in plain else "{:.2%}"
+        # a missing value (e.g. tracking error of the benchmark against itself) is shown as a dash, not "None"
+        shown[col] = [("–" if pd.isna(v) else fmt.format(v)) for v in table[col]]
+    st.dataframe(shown.rename(columns=labels), width="stretch")
 
 
 def progress(table: pd.DataFrame, labels: dict, bars: set[str], counts: set[str]) -> None:

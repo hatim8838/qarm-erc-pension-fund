@@ -26,22 +26,34 @@ def classes_and_sectors(result: dict, choices) -> None:
         st.metric(T["esg_vs"], f"{score:.1f}", T["esg_delta"].format(delta=score - off))
 
 
-def performance_tab(result: dict, net: pd.Series) -> None:
-    """Backtest vs a chosen benchmark b: SR, TE, IR, gross vs net, turnover and weights over time."""
-    benchmark = st.selectbox(T["benchmark"], list(data.benchmarks().columns), key="benchmark")
-    both = pd.concat([net.rename("Your portfolio"), data.benchmarks()[benchmark]], axis=1)
-    blocks.section(T["benchmark"] + f": {benchmark}")
+def performance_tab(result: dict, net: pd.Series, alpha: float) -> None:
+    """The one comparison with a benchmark: your portfolio vs 60/40 or 1/N given the same α (SR, MDD, TE, IR),
+    then gross vs net, turnover and weights over time."""
+    benchmark = st.selectbox(T["benchmark"], cfg.COMPOSITE_BENCHMARKS, key="benchmark")  # 60/40 and 1/N
+    mine = net.rename("Your portfolio")
+    bench = performance.with_alpha(data.benchmarks()[benchmark], alpha, data.risk_free_daily()).rename(benchmark)
+    both = pd.concat([mine, bench], axis=1)
+    blocks.section(T["bench_title"].format(b=benchmark, alpha=blocks.pct(alpha, 0)))
     charts.lines(performance.wealth(both), log_y=True, key="perf_wealth")
     table = performance.metrics_table(both)[["ann_return", "ann_volatility", "sharpe", "max_drawdown"]]
-    rel = performance.relative(net, data.benchmarks()[benchmark])
-    tables.show(table.assign(**rel).rename(columns=content.METRIC_LABELS), plain={content.METRIC_LABELS["sharpe"],
+    # tracking error and IR compare a portfolio with the benchmark: empty on the benchmark row itself
+    for col in ("tracking_error", "information_ratio"):
+        table[col] = float("nan")
+    for col, value in performance.relative(mine, bench).items():
+        table.loc[mine.name, col] = value
+    tables.show(table.rename(columns=content.METRIC_LABELS), plain={content.METRIC_LABELS["sharpe"],
                 content.METRIC_LABELS["information_ratio"]})
+    st.caption(T["bench_note"].format(alpha=blocks.pct(alpha, 0), rf=blocks.pct(1 - alpha, 0)))
     blocks.section(T["gross_net"])
     gross = pd.concat([result["returns"].rename("Gross"), net.rename("Net")], axis=1)
-    tables.show(performance.metrics_table(gross)[["ann_return", "sharpe"]])
-    st.caption(T["turnover"])
+    costs = performance.metrics_table(gross)[["ann_return", "sharpe"]]
+    tables.show(costs.rename(columns=content.METRIC_LABELS), plain={content.METRIC_LABELS["sharpe"]})
+    drag = costs.loc["Gross", "ann_return"] - costs.loc["Net", "ann_return"]
+    st.caption(T["cost_note"].format(bps=cfg.TRANSACTION_COST_BPS, drag=blocks.pct(drag, 2)))
+    blocks.section(T["turnover"])
     charts.bars(result["total_turnover"].iloc[1:].to_frame(T["turnover"]), height=240, key="perf_turnover")
-    st.caption(T["weights_time"])
+    st.caption(T["turnover_note"])
+    blocks.section(T["weights_time"])
     charts.stacked_area(result["weights"], key="perf_weights")
 
 
@@ -51,7 +63,7 @@ def projection_tab(net: pd.Series) -> None:
     blocks.section(T["expected"])
     blocks.figures([(blocks.count_up(100 * e["mu"], 1, "%"), T["expected"]),
                     (blocks.count_up(100 * e["margin"], 1, "%"), "± 95%"),
-                    (blocks.count_up(100 * e["sigma"], 1, "%"), "σ̂")])
+                    (blocks.count_up(100 * e["sigma"], 1, "%"), T["expected_vol"])])
     st.caption(T["ci_note"].format(margin=blocks.pct(e["margin"]), years=e["years"]))
     horizon = st.slider(T["horizon"], 1, cfg.MAX_HORIZON, cfg.DEFAULT_HORIZON, key="horizon")
     blocks.section(T["fan"].format(start=f"{cfg.START_VALUE:,}"))
@@ -60,8 +72,8 @@ def projection_tab(net: pd.Series) -> None:
 
 
 def render(result: dict, choices, values: dict) -> None:
-    """The four tabs, on returns net of the chosen transaction cost."""
-    net = net_returns(result, values["cost"])
+    """The four tabs, on returns net of the transaction cost."""
+    net = net_returns(result, cfg.TRANSACTION_COST_BPS)
     tabs = st.tabs(T["tabs"])
     with tabs[0]:
         composition_tabs.allocation(result)
@@ -71,6 +83,6 @@ def render(result: dict, choices, values: dict) -> None:
         composition_tabs.risk_contribution(result)
         blocks.method_box()
     with tabs[2]:
-        performance_tab(result, net)
+        performance_tab(result, net, choices.alpha())
     with tabs[3]:
         projection_tab(net)

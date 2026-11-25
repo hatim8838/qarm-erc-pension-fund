@@ -51,7 +51,7 @@ COMMODITIES: dict[str, str] = {
     "Agriculture": "GSAGTOT.xlsx",
 }
 COMMODITY_BENCHMARK: str = "GSCITOT.xlsx"
-RISK_FREE: str = "TRUS1MT.xlsx"   # 1-month T-bill, % p.a. -> daily rate = rate / 100 / 252
+RISK_FREE: str = "TRUS1MT.xlsx"   # 1-month T-bill, % p.a. -> daily rate = rate / 100 / TRADING_DAYS
 
 # Benchmarks keyed by source index (+ "Commodities"); ZONES[z]["benchmark"]
 # says which one applies to each equity sleeve.
@@ -127,7 +127,7 @@ REBALANCING_FREQ: str = "M"           # monthly ("Q" for robustness tests)
 ESG_PORTFOLIO_START: str = PORTFOLIO_START  # same period as ERC, for a direct comparison
 ESG_MISSING: str = "exclude"                # stocks without an ESG score are excluded
 
-TRADING_DAYS: int = 252               # annualisation factor for daily returns
+TRADING_DAYS: int = 261               # annualisation: Datastream daily files hold every weekday (~261 a year)
 
 # Debugging for "Investor Preferences"
 MIN_WINDOW_COVERAGE: float = 1.0
