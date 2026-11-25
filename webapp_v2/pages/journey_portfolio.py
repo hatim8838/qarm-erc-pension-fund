@@ -1,5 +1,7 @@
 """Client journey step 3f: the portfolio, an "Adjust my choices" panel and three analysis tabs."""
 
+from __future__ import annotations
+
 import streamlit as st
 
 import config as cfg

@@ -69,6 +69,9 @@ HIST_BINS = 20  # bins of the ESG score histogram
 CSS_FILE = APP_DIR / "assets" / "style.css"
 LOGO_FILES = {"dark": APP_DIR / "assets" / "logo.svg", "light": APP_DIR / "assets" / "logo_light.svg"}
 HERO_PHOTO = APP_DIR / "assets" / "leman_hero.jpg"
+# Team photos: assets/team/<first name in lower case>.jpg (or .jpeg, .png, .webp); the initial is shown otherwise
+TEAM_PHOTO_DIR = APP_DIR / "assets" / "team"
+PHOTO_TYPES = {".jpg": "jpeg", ".jpeg": "jpeg", ".png": "png", ".webp": "webp"}
 THEMES = {  # Streamlit theme options and chart colours of each mode (weight / risk: light and dark bars)
     "dark": {"base": "dark", "primaryColor": "#7CC4FF", "backgroundColor": "#0B0D11",
              "secondaryBackgroundColor": "#14171D", "textColor": "#E8ECF2", "grid": "rgba(255,255,255,0.07)",

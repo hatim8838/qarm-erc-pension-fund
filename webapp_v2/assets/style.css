@@ -109,6 +109,26 @@ h1, h2, h3 { font-family: var(--font); letter-spacing: -0.02em; color: var(--ink
   border-radius: var(--radius-sm); line-height: 1.55; margin: 0.6rem 0 1rem; }
 .insight b { color: var(--accent); font-weight: 600; }
 
+/* ---------- Editorial text sections (Who we are) ---------- */
+.prose-lead { font-size: clamp(1.05rem, 1.6vw, 1.2rem); line-height: 1.55; font-weight: 300; color: var(--ink);
+  max-width: 52rem; margin: 3rem 0 1rem; }
+.prose-lead b, .prose b { font-weight: 600; color: var(--accent); }
+.prose { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr); gap: 2.5rem;
+  border-top: 1px solid var(--line); padding: 2.5rem 0 1rem; margin-top: 1.5rem; }
+.prose h2 { font-size: clamp(1.4rem, 2.4vw, 1.9rem); font-weight: 500; margin: 0; padding: 0; }
+.prose p { font-size: 1.05rem; line-height: 1.75; color: var(--muted); margin: 0 0 1.1rem; max-width: 44rem; }
+.people { list-style: none; margin: 1.2rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.4rem 2.5rem; }
+.people li { margin: 0; padding: 0; display: flex; gap: 1rem; align-items: flex-start; }
+.portrait { flex: none; width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); }
+.portrait.initial { display: grid; place-items: center; background: var(--surface-2); color: var(--accent);
+  font-weight: 600; font-size: 1.5rem; }
+.people .who { display: block; font-weight: 600; color: var(--ink); font-size: 1.05rem; }
+.people .role { display: block; color: var(--accent); font-size: 0.85rem; margin-bottom: 0.3rem; }
+.people p { font-size: 0.95rem; line-height: 1.6; margin: 0; }
+.st-key-prose_faq { border-top: 1px solid var(--line); padding-top: 2.5rem; margin-top: 1.5rem; }
+.st-key-prose_faq h2 { font-size: clamp(1.4rem, 2.4vw, 1.9rem); font-weight: 500; margin: 0; padding: 0; }
+
 /* ---------- CTA band and footer ---------- */
 .st-key-cta_band { margin: 4rem 0 1rem; padding: 2.5rem; border-radius: var(--radius); border: 1px solid var(--line);
   background: radial-gradient(120% 140% at 0% 0%, var(--glow), transparent 60%), var(--surface); }
@@ -120,7 +140,8 @@ h1, h2, h3 { font-family: var(--font); letter-spacing: -0.02em; color: var(--ink
 
 /* ---------- Small screens and reduced motion ---------- */
 @media (max-width: 820px) {
-  .figures, .bento.cols-2, .bento.cols-3, .steps { grid-template-columns: 1fr; }
+  .figures, .bento.cols-2, .bento.cols-3, .steps, .prose, .people { grid-template-columns: 1fr; }
+  .prose { gap: 1rem; }
   .block-container { padding-left: 1rem; padding-right: 1rem; }
   .hero.photo { padding: 3rem 1.4rem; }
 }

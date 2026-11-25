@@ -1,4 +1,8 @@
-"""Who we are: photo hero with live figures, mandate, team, approach, 3 steps, FAQ and CTA."""
+"""Who we are: photo hero, an opening paragraph with live figures, editorial sections, team, FAQ and CTA."""
+
+from html import escape
+
+import streamlit as st
 
 import config as cfg
 import content
@@ -8,29 +12,31 @@ from ui import blocks
 T = content.TEXT
 
 
-def key_figures() -> None:
-    """Universe size, history length and the Sharpe ratio of core's ERC, all from the data."""
-    erc = data.portfolio_returns()[[cfg.CORE_ERC]].dropna()
-    sharpe = performance.metrics_table(erc).loc[cfg.CORE_ERC, "sharpe"]
-    years = (erc.index[-1] - erc.index[0]).days / 365.25
-    n_assets = sum(data.sleeve_tail(s).shape[1] for s in data.sleeves())
-    blocks.figures([
-        (blocks.count_up(n_assets), T["who_figures"][0].format(n=len(data.sleeves()))),
-        (blocks.count_up(years), T["who_figures"][1].format(year=erc.index[0].year)),
-        (blocks.count_up(sharpe, 2), T["who_figures"][2]),
-    ])
+def figures() -> dict:
+    """Universe size, history length and Sharpe ratios of core's ERC and 60/40, all from the data."""
+    returns = data.portfolio_returns()[[cfg.CORE_ERC, "60/40"]].dropna()
+    sharpe = performance.metrics_table(returns)["sharpe"]
+    alphas = cfg.ALPHAS.values()
+    return {"n_assets": f"{sum(data.sleeve_tail(s).shape[1] for s in data.sleeves()):,}", "n_sleeves": len(data.sleeves()),
+            "years": round((returns.index[-1] - returns.index[0]).days / 365.25), "year": returns.index[0].year,
+            "sharpe": f"{sharpe[cfg.CORE_ERC]:.2f}", "sharpe_bench": f"{sharpe['60/40']:.2f}",
+            "low": blocks.pct(min(alphas), 0), "high": blocks.pct(max(alphas), 0)}
 
 
+def faq() -> None:
+    """Questions in the same two-column layout as the text sections."""
+    with st.container(key="prose_faq"):
+        left, right = st.columns([1, 2.2], gap="large")
+        left.html(f"<h2>{escape(T['faq'])}</h2>")
+        with right:
+            blocks.faq(content.FAQ)
+
+
+values = figures()
 blocks.hero("who", cfg.PAGES["journey"], photo=True)
-key_figures()
-blocks.cards([{"title": content.MANDATE[0], "body": content.MANDATE[1]}], columns=1)
-blocks.section(T["team"])
-blocks.cards([{"avatar": m["name"][0], "kicker": m["role"], "title": m["name"], "body": m["bio"], "tags": m["tags"]}
-              for m in content.TEAM])
-blocks.section(T["approach"])
-blocks.cards([{"title": t, "body": body} for t, body in content.APPROACH])
-blocks.section(T["steps"])
-blocks.steps(T["three_steps"])
-blocks.section(T["faq"])
-blocks.faq(content.FAQ)
+blocks.lead(content.WHO_INTRO, values)
+for title, paragraphs in content.WHO:
+    blocks.prose(title, paragraphs, values)
+blocks.people(T["team"], content.TEAM_INTRO, content.TEAM)
+faq()
 blocks.cta_band(T["closing_cta"], content.HERO["who"][2], cfg.PAGES["journey"])

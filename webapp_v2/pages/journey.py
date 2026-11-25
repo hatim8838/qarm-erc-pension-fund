@@ -1,5 +1,7 @@
 """Client journey: a stepper over 3a-3f; choices live in st.session_state."""
 
+from __future__ import annotations
+
 from copy import deepcopy
 
 import streamlit as st

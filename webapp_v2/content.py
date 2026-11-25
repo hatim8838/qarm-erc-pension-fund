@@ -37,16 +37,39 @@ TEAM = [
      "bio": "Manages operations and client communication, ensuring a transparent and responsive service."},
 ]
 
-APPROACH = [
-    ("Risk, not capital", "Every building block contributes the same share of risk (Equal Risk "
-     "Contribution), so no single market dominates the pension."),
-    ("Robust estimates", "Covariances are shrunk towards a constant-correlation target (Ledoit-Wolf), "
-     "and no expected return is needed to build the weights."),
-    ("Your risk level", "You choose α, the share invested in the ERC portfolio; the rest earns the "
-     "risk-free rate. Same Sharpe ratio, your level of risk."),
+# "Who we are": editorial sections (heading, paragraphs). {placeholders} are filled with computed figures.
+WHO_INTRO = ("Léman Wealth Management manages pension savings around one idea: no single market should decide how "
+             "your retirement turns out. Our portfolio invests in {n_assets} assets across {n_sleeves} building "
+             "blocks, and we have tested it on {years} years of markets, from {year} to today, rebalancing it every "
+             "month.")
+WHO = [
+    ("Our mandate", [
+        "We run a multi-asset pension fund. Equities are held in regional sleeves, alongside US investment-grade "
+        "bonds and a basket of commodities. Every month we rebuild the portfolio from the latest data and trade "
+        "back to the new weights.",
+        "Clients can add an ESG screen that removes the worst-rated stocks of each region before the portfolio is "
+        "built, and they choose how much risk they want to take. Everything else follows the same rules for "
+        "everyone.",
+    ]),
+    ("How we invest", [
+        "Our method starts from risk instead of money. With Equal Risk Contribution, every building block of the "
+        "portfolio, each equity region, bonds and commodities, adds the same share to its overall risk. Volatile "
+        "assets receive less money and calmer ones receive more, so no single market dominates.",
+    ]),
+    ("Your level of risk", [
+        "Sharing risk equally says nothing about how much risk you take overall. That part is yours: you pick "
+        "one of five risk levels, which sets the share of your money invested in the ERC portfolio, from {low} "
+        "to {high}. The rest earns the risk-free rate.",
+    ]),
+    ("Working with us", [
+        "Building your portfolio takes a few minutes in the Client journey. You tell us which regions, asset "
+        "classes and sectors you want to hold, whether to apply an ESG screen, and your risk level.",
+        "We then budget the risk and show you the result straight away: the allocation, each holding's share of "
+        "risk, past performance against a benchmark, and a projection of where your savings could go. Change any "
+        "choice and the portfolio updates in front of you.",
+    ]),
 ]
-MANDATE = ("Our mandate", "A multi-asset pension fund: global equities in regional sleeves, US bonds and "
-           "commodities, allocated by equal risk contribution, with an optional ESG screen, rebalanced every month.")
+TEAM_INTRO = "Six people, each responsible for one part of the investment process."
 
 WHY_RB = [
     ("No return forecast", "ERC only needs the covariance matrix Σ: the weights do not depend on "
@@ -110,13 +133,8 @@ TEXT = {
     "class_note": "Annual return and volatility since {start}: official indices for equities and bonds, our sleeve of "
                   "three S&P GSCI sector indices for commodities.",
     "stocks_left": "stocks left in {region}",
-    "team": "The team", "approach": "Our approach", "steps": "Three steps to your portfolio", "faq": "Questions",
-    "who_figures": ["assets across {n} sleeves", "years of monthly rebalancing since {year}",
-                    "Sharpe ratio of our ERC portfolio"],
+    "team": "The team", "faq": "Questions",
     "closing_cta": "Ready to see your portfolio?",
-    "three_steps": [("Tell us about you", "Regions, classes, sectors, an ESG screen and your risk level."),
-                    ("We budget the risk", "Two-level ERC on shrunk covariances, mixed with the risk-free asset."),
-                    ("See your portfolio", "Allocation, performance and projection, updated as you adjust.")],
     "why_rb": "Why risk budgeting", "lab": "EW vs ERC on our sleeves today",
     "lab_sub": "Risk contributions RC*_i of equal weights and of ERC on the same Ledoit-Wolf Σ̂ ({date}).",
     "theorem": "σ(x_mv) ≤ σ(x_erc) ≤ σ(x_ew) held at {share} of our {n} monthly rebalancings.",

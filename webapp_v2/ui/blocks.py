@@ -77,6 +77,40 @@ def _card(index: int, item: dict) -> str:
     return f'<article class="card rise" style="--i:{index}">{"".join(parts)}</article>'
 
 
+def _fill(text: str, values: dict) -> str:
+    """Escape a content.py template, then insert the computed figures in bold."""
+    return escape(text).format(**{k: f"<b>{escape(str(v))}</b>" for k, v in values.items()})
+
+
+def lead(text: str, values: dict | None = None) -> None:
+    """Large opening paragraph under the hero, without a box."""
+    st.html(f'<p class="prose-lead rise">{_fill(text, values or {})}</p>')
+
+
+def prose(title: str, paragraphs: list[str], values: dict | None = None) -> None:
+    """Editorial section: heading on the left, flowing paragraphs on the right, thin divider above."""
+    body = "".join(f"<p>{_fill(p, values or {})}</p>" for p in paragraphs)
+    st.html(f'<section class="prose rise"><h2>{escape(title)}</h2><div>{body}</div></section>')
+
+
+def _portrait(name: str) -> str:
+    """Round photo from assets/team/<name>.<ext> as a data URI, or the initial when there is no photo."""
+    for ext, kind in cfg.PHOTO_TYPES.items():
+        path = cfg.TEAM_PHOTO_DIR / f"{name.lower()}{ext}"
+        if path.exists():
+            uri = f"data:image/{kind};base64," + base64.b64encode(path.read_bytes()).decode()
+            return f'<img class="portrait" src="{uri}" alt="{escape(name)}">'
+    return f'<span class="portrait initial">{escape(name[:1])}</span>'
+
+
+def people(title: str, intro: str, team: list[dict]) -> None:
+    """Team as a plain list (photo, name, role, one sentence) in the editorial layout."""
+    rows = "".join(f'<li>{_portrait(m["name"])}<div><span class="who">{escape(m["name"])}</span>'
+                   f'<span class="role">{escape(m["role"])}</span><p>{escape(m["bio"])}</p></div></li>' for m in team)
+    st.html(f'<section class="prose rise"><h2>{escape(title)}</h2><div><p>{escape(intro)}</p>'
+            f'<ul class="people">{rows}</ul></div></section>')
+
+
 def steps(items: list[tuple[str, str]]) -> None:
     """Numbered "3 steps" block."""
     html = "".join(f'<div class="step rise" style="--i:{i}"><span class="num">{i + 1}</span>'
