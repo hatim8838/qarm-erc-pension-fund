@@ -48,6 +48,12 @@ def theorem_holds(result: dict, tol: float = 1e-8) -> pd.Series:
     return pd.Series(out)
 
 
+def strategy_lab(result: dict) -> tuple[pd.DataFrame, pd.Series]:
+    """"Our strategy": EW / ERC / MV on the last rebalancing, and the theorem at every rebalancing."""
+    d = last_decision(result)
+    return compare_ew_erc_mv(d["cov"], d["x"]), theorem_holds(result)
+
+
 def holdings_count(result: dict) -> int:
     """Number of lines held today (stocks, bond and commodity indices; not the risk-free asset)."""
     return int((stock_weights(result).drop(cfg.RISK_FREE, errors="ignore") > 0).sum())

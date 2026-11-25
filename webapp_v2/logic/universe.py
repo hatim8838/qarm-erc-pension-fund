@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 import config as cfg
-from core.utilities import eligible_assets, rebalancing_dates
+from core.utilities import eligible_assets
 from logic import data
 
 
@@ -36,11 +36,10 @@ def worst_esg(candidates: pd.Index, esg: str) -> pd.Index:
 
 def last_window(sleeve: str, sectors: tuple[str, ...]) -> pd.DataFrame:
     """Estimation window of the last rebalancing, on the eligible assets of the sleeve (core's rule)."""
-    returns = data.sleeve_returns(sleeve)
+    tail = data.sleeve_tail(sleeve)
     if sleeve in data.regions():
-        returns = returns[returns.columns.intersection(sector_stocks(sleeve, sectors))]
-    t = rebalancing_dates(returns.index, cfg.PORTFOLIO_START, cfg.REBALANCING_FREQ)[-1]
-    return returns.loc[:t].tail(cfg.ESTIMATION_WINDOW).loc[:, eligible_assets(returns, t)]
+        tail = tail[tail.columns.intersection(sector_stocks(sleeve, sectors))]
+    return tail.loc[:, eligible_assets(tail, tail.index[-1])]
 
 
 @lru_cache(maxsize=256)

@@ -25,6 +25,10 @@ COMPOSITE_BENCHMARKS = ["60/40", "1/N"]  # pre-computed in portfolio_returns.par
 INDEX_LABELS = core_config.BENCHMARK_LABELS  # benchmark file column -> index name
 BOND_INDEX = "AGG"  # index shown for the bond sleeve
 ASSET_ID_SEP = core_config.ASSET_ID_SEP
+# Precomputed results (scripts/precompute.py), used only while these inputs are unchanged
+PRECOMPUTED_DIR = APP_DIR / "precomputed"
+PRECOMPUTE_INPUTS = sorted([*PROCESSED_DIR.glob(core_config.PROCESSED_FILES["returns_daily"].format(ac="*") + ".parquet"),
+                            PROCESSED_DIR / "esg_universe.parquet", PROCESSED_DIR / "rf.parquet", SLEEVE_WEIGHTS_FILE])
 EQUITIES = "Equities"  # asset-class label of the regional equity sleeves
 
 # --------------------------------------------------------------------------- #

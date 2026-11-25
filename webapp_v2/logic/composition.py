@@ -51,12 +51,25 @@ def positions(result: dict, n: int, total_money: bool = False) -> pd.DataFrame:
     return pd.DataFrame({"weight": w.to_numpy(), "sleeve": sleeve, "name": name}, index=w.index)
 
 
+def sleeve_rc(sleeve: str, w: pd.Series, t: pd.Timestamp) -> pd.Series:
+    """RC*_i of the weights held inside a sleeve on date t, on that date's Σ̂."""
+    window = data.sleeve_returns(sleeve).loc[:t, w.index].tail(cfg.ESTIMATION_WINDOW)
+    return decomposition(w, ledoit_wolf_cc(window))["RC*"]
+
+
+def rc_frame(sleeve: str, weights: pd.DataFrame) -> pd.DataFrame:
+    """sleeve_rc at every rebalancing, aligned on the level-1 weights (NaN where not held)."""
+    rows = {t: sleeve_rc(sleeve, w[w > 0], t) for t, w in weights.iterrows() if (w > 0).any()}
+    return pd.DataFrame(rows).T.reindex(index=weights.index, columns=weights.columns)
+
+
 def inner(result: dict, sleeve: str) -> pd.DataFrame:
-    """Weights inside a sleeve and their RC*_i on that date's Σ̂, largest weight first."""
+    """Weights inside a sleeve and their RC*_i on that date's Σ̂, largest weight first (stored RC when the
+    level 1 comes from precomputed/)."""
     t, _ = _last(result)
     w = _inner_weights(result, sleeve, t)
-    window = data.sleeve_returns(sleeve).loc[:t, w.index].tail(cfg.ESTIMATION_WINDOW)
-    rc = decomposition(w, ledoit_wolf_cc(window))["RC*"]
+    stored = result["level1"][sleeve].get("rc")
+    rc = stored.loc[t, w.index] if stored is not None else sleeve_rc(sleeve, w, t)
     names = [i.split(cfg.ASSET_ID_SEP, 1)[1] for i in w.index]
     return pd.DataFrame({"weight": w.to_numpy(), "rc": rc.to_numpy()}, index=names).sort_values("weight",
                                                                                                 ascending=False)

@@ -26,6 +26,7 @@ def classes_and_sectors(result: dict, choices) -> None:
         st.metric(T["esg_vs"], f"{score:.1f}", T["esg_delta"].format(delta=score - off))
 
 
+@st.fragment
 def performance_tab(result: dict, net: pd.Series, alpha: float) -> None:
     """The one comparison with a benchmark: your portfolio vs 60/40 or 1/N given the same α (SR, MDD, TE, IR),
     then gross vs net, turnover and weights over time."""
@@ -57,6 +58,7 @@ def performance_tab(result: dict, net: pd.Series, alpha: float) -> None:
     charts.stacked_area(result["weights"], key="perf_weights")
 
 
+@st.fragment
 def projection_tab(net: pd.Series) -> None:
     """μ̂ with its 95% estimation interval and the log-normal fan of 10,000."""
     e = projection.expected_return(net)

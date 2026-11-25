@@ -8,6 +8,8 @@ import pandas as pd
 
 import config as cfg
 from core.importation_data import read_esg_universe, read_processed
+from core.utilities import rebalancing_dates
+from logic import store
 
 
 @lru_cache(maxsize=1)
@@ -50,6 +52,18 @@ def sleeve_returns(sleeve: str) -> pd.DataFrame:
     df = read_processed("returns_daily", source)
     df.columns = [f"{sleeve}{cfg.ASSET_ID_SEP}{c}" for c in df.columns]
     return df.loc[:, df.notna().any()]
+
+
+@lru_cache(maxsize=None)
+def sleeve_tail(sleeve: str) -> pd.DataFrame:
+    """Returns of every asset of a sleeve over the last estimation window (up to the last rebalancing):
+    precomputed when available, so the full history is not read."""
+    stored = store.load_tail(sleeve)
+    if stored is not None:
+        return stored
+    returns = sleeve_returns(sleeve)
+    t = rebalancing_dates(returns.index, cfg.PORTFOLIO_START, cfg.REBALANCING_FREQ)[-1]
+    return returns.loc[:t].tail(cfg.ESTIMATION_WINDOW)
 
 
 @lru_cache(maxsize=1)

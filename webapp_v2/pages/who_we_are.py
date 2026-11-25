@@ -13,7 +13,7 @@ def key_figures() -> None:
     erc = data.portfolio_returns()[[cfg.CORE_ERC]].dropna()
     sharpe = performance.metrics_table(erc).loc[cfg.CORE_ERC, "sharpe"]
     years = (erc.index[-1] - erc.index[0]).days / 365.25
-    n_assets = sum(data.sleeve_returns(s).shape[1] for s in data.sleeves())
+    n_assets = sum(data.sleeve_tail(s).shape[1] for s in data.sleeves())
     blocks.figures([
         (blocks.count_up(n_assets), T["who_figures"][0].format(n=len(data.sleeves()))),
         (blocks.count_up(years), T["who_figures"][1].format(year=erc.index[0].year)),

@@ -8,7 +8,7 @@ import pandas as pd
 
 import config as cfg
 from core.utilities import backtest, erc_weights
-from logic import data, universe
+from logic import data, store, universe
 from logic.covariance import ledoit_wolf_cc
 from logic.risk import volatility
 
@@ -27,13 +27,31 @@ def screened_erc(window: pd.DataFrame, esg: str, covariance=ledoit_wolf_cc) -> t
     return erc(window[candidates[~candidates.isin(excluded)]], covariance), excluded
 
 
-@lru_cache(maxsize=64)
-def level1(sleeve: str, sectors: tuple[str, ...], esg: str, covariance=ledoit_wolf_cc) -> dict:
-    """Level 1 inside one sleeve at every monthly rebalancing, held with drift (core.backtest).
-    Bonds and commodities ignore the sector and ESG filters (see portfolio.filters)."""
+def sleeve_returns(sleeve: str, sectors: tuple[str, ...]) -> pd.DataFrame:
+    """Daily returns of the assets of a sleeve, restricted to the chosen sectors for a region."""
     returns = data.sleeve_returns(sleeve)
     if sleeve in data.regions():
         returns = returns[returns.columns.intersection(universe.sector_stocks(sleeve, sectors))]
+    return returns
+
+
+def precomputed(sleeve: str, sectors: tuple[str, ...], covariance=ledoit_wolf_cc) -> bool:
+    """True when scripts/precompute.py stored this level 1: Ledoit-Wolf and every sector (or no region)."""
+    return covariance is ledoit_wolf_cc and (sleeve not in data.regions() or set(sectors) == set(data.sectors()))
+
+
+@lru_cache(maxsize=64)
+def level1(sleeve: str, sectors: tuple[str, ...], esg: str, covariance=ledoit_wolf_cc) -> dict:
+    """Level 1 inside one sleeve at every monthly rebalancing, held with drift (core.backtest): read from
+    precomputed/ when stored there, else computed live. Bonds and commodities ignore the sector and ESG
+    filters (see portfolio.filters)."""
+    stored = store.load_level1(sleeve, esg) if precomputed(sleeve, sectors, covariance) else None
+    return stored if stored is not None else _level1_live(sleeve, sectors, esg, covariance)
+
+
+def _level1_live(sleeve: str, sectors: tuple[str, ...], esg: str, covariance) -> dict:
+    """Level 1 computed live: screen and ERC on every estimation window."""
+    returns = sleeve_returns(sleeve, sectors)
     screen = {}
 
     def weight_fn(window: pd.DataFrame) -> pd.Series:
@@ -45,6 +63,16 @@ def level1(sleeve: str, sectors: tuple[str, ...], esg: str, covariance=ledoit_wo
     result = backtest(returns, weight_fn, cfg.PORTFOLIO_START, cfg.REBALANCING_FREQ)
     result.update(screen=screen, windows=sleeve_windows(returns, result["weights"]))
     return result
+
+
+def last_erc(sleeve: str, sectors: tuple[str, ...], esg: str) -> tuple[pd.Series, pd.DataFrame]:
+    """Level-1 weights at the last rebalancing and the window they are estimated on (the stored weights
+    when available: the same numbers, without solving the ERC again)."""
+    window = universe.last_window(sleeve, sectors)
+    stored = store.load_last_weights(sleeve, esg) if precomputed(sleeve, sectors) else None
+    if stored is None or stored[0] != window.index[-1]:
+        return screened_erc(window, esg)[0], window
+    return stored[1], window
 
 
 def sleeve_windows(returns: pd.DataFrame, weights: pd.DataFrame) -> dict[pd.Timestamp, pd.Series]:

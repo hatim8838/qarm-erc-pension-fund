@@ -38,6 +38,7 @@ def _positions(result: dict, total_money: bool) -> None:
     charts.ranked(pd.Series(top["weight"].to_numpy(), index=labels), colors, C["weight_axis"], key="alloc_top")
 
 
+@st.fragment
 def allocation(result: dict) -> None:
     """Inside the ERC portfolio (sums to 100%), or × α with a risk-free slice when the toggle is on."""
     blocks.section(C["inside"].format(alpha=pct(result["alpha"], 0)))
@@ -47,6 +48,7 @@ def allocation(result: dict) -> None:
     _positions(result, total_money)
 
 
+@st.fragment
 def _inside_sleeve(result: dict, sleeves: list[str]) -> None:
     """Weight inside the chosen sleeve vs RC*_i for its largest assets, against the target 1/N."""
     blocks.section(C["inside_sleeve"])

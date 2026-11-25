@@ -5,12 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from functools import lru_cache
 
+import numpy as np
 import pandas as pd
 
 import config as cfg
-from core.utilities import backtest, rebalancing_dates
-from logic import data, universe
-from logic.construction import level1, level2, screened_erc
+from core.utilities import rebalancing_dates
+from logic import data
+from logic.construction import last_erc, level1, level2
 from logic.covariance import ledoit_wolf_cc
 
 FULL = max(cfg.ALPHAS)  # the risk level with α = 1: the ERC portfolio itself
@@ -64,8 +65,10 @@ def _held_returns(sleeves: dict[str, dict]) -> pd.DataFrame:
 
 
 @lru_cache(maxsize=16)
-def erc_part(choices: Choices, covariance=ledoit_wolf_cc) -> dict:
-    """The part that does not depend on α: level 1 of each sleeve and the level-2 x_erc at each date."""
+def erc_part(regions: tuple, classes: tuple, sectors: tuple, esg: str, covariance=ledoit_wolf_cc) -> dict:
+    """The part that does not depend on α (never in the key): level 1 of each sleeve and the level-2 x_erc
+    at each date."""
+    choices = Choices(regions, classes, sectors, esg)
     sleeves = {s: level1(s, *filters(choices, s), covariance=covariance) for s in client_sleeves(choices)}
     held = _held_returns(sleeves)
     dates = rebalancing_dates(held.index, cfg.PORTFOLIO_START, cfg.REBALANCING_FREQ)
@@ -76,27 +79,51 @@ def erc_part(choices: Choices, covariance=ledoit_wolf_cc) -> dict:
 
 def build(choices: Choices, covariance=ledoit_wolf_cc) -> dict:
     """Backtest of y = α·x_erc + (1 − α)·r, rebalanced monthly back to α (LN 2), with every decision."""
-    part, alpha = erc_part(choices.but(level=FULL), covariance), choices.alpha()
+    return mix(erc_part(choices.regions, choices.classes, choices.sectors, choices.esg, covariance), choices)
 
-    def weight_fn(window: pd.DataFrame) -> pd.Series:
-        """α in the ERC sleeves, 1 − α in the risk-free asset."""
-        x = part["decisions"][window.index[-1]]["x"]
-        return pd.concat([alpha * x, pd.Series({cfg.RISK_FREE: 1.0 - alpha})])
 
-    result = backtest(part["held"], weight_fn, cfg.PORTFOLIO_START, cfg.REBALANCING_FREQ)
+def _hold(held: pd.DataFrame, w: pd.Series, t, end, port: np.ndarray) -> pd.Series:
+    """Hold w from t+1 to end with drift, writing the daily returns into port (core.backtest's arithmetic)."""
+    i0, i1 = held.index.searchsorted(t, "right"), held.index.searchsorted(end, "right")
+    wt = w.to_numpy()
+    for i, r in enumerate(held.iloc[i0:i1][w.index].fillna(0.0).to_numpy(), start=i0):
+        rp = wt @ r
+        port[i] = rp
+        wt = wt * (1 + r) / (1 + rp)
+    return pd.Series(wt, index=w.index)
+
+
+def mix(part: dict, choices: Choices) -> dict:
+    """The α mix applied after the (cached) ERC part: α in the ERC sleeves, 1 − α in the risk-free asset,
+    held with drift and rebalanced monthly. The same steps and arithmetic as core.backtest, without its
+    estimation windows (the mix only needs the date), so a change of α costs a few milliseconds."""
+    alpha, held = choices.alpha(), part["held"]
+    dates = rebalancing_dates(held.index, cfg.PORTFOLIO_START, cfg.REBALANCING_FREQ)
+    port, weights, turnover, current = np.full(len(held), np.nan), {}, {}, pd.Series(dtype=float)
+    for t, end in zip(dates, [*dates[1:], held.index[-1]]):
+        w = pd.concat([alpha * part["decisions"][t]["x"], pd.Series({cfg.RISK_FREE: 1.0 - alpha})])
+        weights[t] = w
+        turnover[t] = 0.5 * w.sub(current, fill_value=0).abs().sum() if len(current) else 1.0
+        current = _hold(held, w, t, end, port)
+    result = {"returns": pd.Series(port, index=held.index, name="portfolio").dropna(),
+              "weights": pd.DataFrame(weights).T.fillna(0.0), "turnover": pd.Series(turnover, name="turnover")}
     result.update(decisions=part["decisions"], level1=part["level1"], choices=choices, alpha=alpha)
     result["total_turnover"] = total_turnover(result)
     return result
 
 
-@lru_cache(maxsize=64)
 def today(choices: Choices) -> pd.Series:
     """Stock weights of the ERC portfolio (α = 1) at the last rebalancing, from the last windows only."""
+    return _today(choices.regions, choices.classes, choices.sectors, choices.esg)
+
+
+@lru_cache(maxsize=64)
+def _today(regions: tuple, classes: tuple, sectors: tuple, esg: str) -> pd.Series:
+    """today() keyed by the α-free choices."""
+    choices = Choices(regions, classes, sectors, esg)
     inner = {}
     for s in client_sleeves(choices):
-        sectors, esg = filters(choices, s)
-        window = universe.last_window(s, sectors)
-        w = screened_erc(window, esg)[0]
+        w, window = last_erc(s, *filters(choices, s))
         if not w.empty:
             inner[s] = (w, window)
     x = level2(pd.DataFrame({s: win[w.index] @ w for s, (w, win) in inner.items()}))["x"]

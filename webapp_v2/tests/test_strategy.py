@@ -7,7 +7,7 @@ from conftest import profiles
 
 import config as cfg
 from core.utilities import covariance_matrix
-from logic import data, portfolio, projection, universe
+from logic import data, portfolio, projection, store, universe
 from logic.construction import level1
 from logic.covariance import ledoit_wolf_cc
 from logic.report import theorem_holds
@@ -140,6 +140,7 @@ def test_no_look_ahead(built, monkeypatch):
     full_returns, full_rf = data.sleeve_returns, data.risk_free_daily
     monkeypatch.setattr(data, "sleeve_returns", lambda s: full_returns(s).loc[:t])
     monkeypatch.setattr(data, "risk_free_daily", lambda: full_rf().loc[:t])
+    monkeypatch.setitem(store.STATE, "enabled", False)  # recompute every sleeve on the truncated data
     caches = (level1, portfolio.erc_part)
     for cache in caches:
         cache.cache_clear()

@@ -14,6 +14,7 @@ from ui import blocks
 # widgets are not drawn; widgets copy their value here in on_change callbacks.
 DEFAULTS = {"step": "regions", "regions": [], "classes": [], "sectors": data.sectors(),
             "esg": portfolio.NO_SCREEN, "level": cfg.DEFAULT_LEVEL}
+SHOWN = "_stepper_shown"  # (step, steps) drawn by the last full run of the page
 RENDER = {"regions": journey_steps.regions, "classes": journey_steps.classes, "sectors": journey_steps.sectors,
           "esg": journey_steps.esg, "profile": journey_steps.profile_step, "portfolio": journey_portfolio.render}
 
@@ -63,10 +64,26 @@ def nav_buttons(step: str, steps: list[str], values: dict) -> None:
                        disabled=message is not None, width="stretch")
 
 
-values = state()
-steps = journey.active_steps(values["classes"])
-step = values["step"] if values["step"] in steps else steps[0]
+def current() -> tuple[dict, list[str], str]:
+    """Journey values, active steps and the step to show."""
+    values = state()
+    steps = journey.active_steps(values["classes"])
+    return values, steps, values["step"] if values["step"] in steps else steps[0]
+
+
+@st.fragment
+def step_body() -> None:
+    """The current step and its Back / Next buttons: a widget here reruns only this block. When the step
+    or the list of steps changes (Back, Next, equities on or off), the whole page reruns for the stepper."""
+    values, steps, step = current()
+    if (step, steps) != st.session_state.get(SHOWN):
+        st.rerun()
+    RENDER[step](values)
+    nav_buttons(step, steps, state())
+
+
+_, steps_shown, step_shown = current()
+st.session_state[SHOWN] = (step_shown, steps_shown)
 blocks.hero("journey")
-stepper(step, steps)
-RENDER[step](values)
-nav_buttons(step, steps, state())
+stepper(step_shown, steps_shown)
+step_body()
