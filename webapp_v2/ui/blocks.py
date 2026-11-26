@@ -11,6 +11,8 @@ import streamlit as st
 
 import config as cfg
 import content
+from core.importation_data import MIN_PRICE
+from logic import data, universe
 
 
 def pct(value: float, decimals: int = 1) -> str:
@@ -22,13 +24,51 @@ def count_up(value: float, decimals: int = 0, suffix: str = "") -> str:
     """HTML of a number that counts up from 0 (CSS-only: one animated counter per digit group)."""
     sign = "-" if value < 0 else ""
     whole, frac = f"{abs(value):.{decimals}f}".partition(".")[::2]
-    html = f'{sign}<span class="count" style="--to:{int(whole)}"></span>'
+    whole = f"{int(whole):,}"  # thousands separators as plain text between animated groups ("1,102")
+    groups = whole.split(",")  # every group after the first is shown with 3 digits (class pad3)
+    html = sign + ",".join(f'<span class="count{" pad3" if i else ""}" style="--to:{int(g)}"></span>'
+                           for i, g in enumerate(groups))
     if decimals:
         zeros = len(frac) - len(frac.lstrip("0"))  # leading zeros of the decimals are written out
         tail = f'<span class="count" style="--to:{int(frac)}"></span>' if frac.strip("0") else ""
         html += "." + "0" * zeros + tail
     label = f"{sign}{whole}{'.' + frac if decimals else ''}{suffix}"
     return f'<span class="figure-value" aria-label="{label}">{html}{escape(suffix)}</span>'
+
+
+def stock_line(counts: dict[str, int], short: bool = False) -> str:
+    """The universe phrase, e.g. "1,108 stocks in our universe · 1,104 investable today (4 listed less than a
+    year ago)", from logic.universe.stock_counts."""
+    text = (content.STOCK_LINE_SHORT if short else content.STOCK_LINE).format(
+        listed=f"{counts['listed']:,}", investable=f"{counts['investable']:,}")
+    why = [t.format(n=f"{counts[k]:,}") for k, t in content.STOCK_LINE_WHY.items() if counts[k]]
+    return f"{text} ({', '.join(why)})" if why and not short else text
+
+
+def plural(n: int, names: tuple[str, str]) -> str:
+    """Singular or plural name of a count: (name, names)."""
+    return names[n != 1]
+
+
+def join_and(parts: list[str]) -> str:
+    """"a, b and c"."""
+    return " and ".join([", ".join(parts[:-1]), parts[-1]]) if len(parts) > 1 else "".join(parts)
+
+
+def index_line(counts: dict[str, int]) -> str:
+    """The non-equity indices, e.g. "1 bond index and 3 commodity indices" (never added to the stocks)."""
+    return join_and([f"{n:,} {plural(n, content.INDEX_NAMES[s])}" for s, n in counts.items()])
+
+
+def universe_values() -> dict[str, str]:
+    """Computed figures of the method box and the FAQ: stock counts and names (universe.stock_counts, all
+    regions and sectors, ESG Off), the price floor of the data cleaning and the names of the indices."""
+    regions, sectors = tuple(data.regions()), tuple(data.sectors())
+    counts = universe.stock_counts(regions, sectors, next(iter(cfg.ESG_LEVELS)))
+    return {**{k: f"{counts[k]:,}" for k in ("listed", "investable", "recent", "unusable")},
+            **{f"{s}_names": join_and(universe.stock_names(regions, sectors, s)) for s in ("recent", "unusable")},
+            "floor": f"{MIN_PRICE:.2f}", "tick": pct(cfg.PRICE_TICK / MIN_PRICE, 0),
+            "indices": join_and([cfg.INDEX_LABELS[r] for r in regions])}
 
 
 def figures(items: list[tuple[str, str]]) -> None:
@@ -125,11 +165,11 @@ def steps(items: list[tuple[str, str]]) -> None:
     st.html(f'<div class="steps">{html}</div>')
 
 
-def faq(items: list[tuple[str, str]]) -> None:
-    """FAQ accordion (native expanders, styled in CSS)."""
+def faq(items: list[tuple[str, str]], values: dict | None = None) -> None:
+    """FAQ accordion (native expanders, styled in CSS); {placeholders} of the answers are filled from values."""
     for question, answer in items:
         with st.expander(question):
-            st.write(answer)
+            st.write(answer.format(**(values or {})))
 
 
 def cta_band(title: str, label: str, page: str) -> None:
@@ -150,11 +190,12 @@ def insight(html: str) -> None:
 
 
 def method_box() -> None:
-    """Shared "Method and limitations" expander, filled from config (window, α range, ESG levels)."""
+    """Shared "Method and limitations" expander, filled from config (window, α range, ESG levels) and from the
+    data (stock counts and names, price floor, index names)."""
     title, items = content.METHOD
     alphas, levels = cfg.ALPHAS.values(), [v for v in cfg.ESG_LEVELS.values() if v > 0]
     values = {"n": cfg.ESTIMATION_WINDOW, "low": pct(min(alphas), 0), "high": pct(max(alphas), 0),
-              "levels": "/".join(f"{100 * v:.0f}" for v in levels) + "%"}
+              "levels": "/".join(f"{100 * v:.0f}" for v in levels) + "%", **universe_values()}
     with st.expander(title, icon=":material/info:"):
         st.markdown("\n".join(f"- {item.format(**values)}" for item in items))
 

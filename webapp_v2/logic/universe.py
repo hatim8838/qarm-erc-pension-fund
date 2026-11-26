@@ -42,17 +42,60 @@ def last_window(sleeve: str, sectors: tuple[str, ...]) -> pd.DataFrame:
     return tail.loc[:, eligible_assets(tail, tail.index[-1])]
 
 
+COUNT_KEYS = ("listed", "investable", "recent", "unusable", "excluded_esg", "kept")
+
+
+@lru_cache(maxsize=64)
+def _region_status(region: str, sectors: tuple[str, ...]) -> pd.Series:
+    """Status of every listed stock of a region at the last rebalancing, from the last estimation window only
+    (no heavy computation): "investable", "recent" (history starts inside the window) or "unusable"."""
+    listed = sector_stocks(region, sectors)
+    present = data.sleeve_tail(region).reindex(columns=listed).notna()  # a stock with no price has no column
+    trailing = present.iloc[::-1].cummin().sum()  # consecutive returns up to the last rebalancing
+    recent = present.iloc[-1] & ~present.iloc[0] & (trailing == present.sum())
+    ok = listed.isin(investable(last_window(region, sectors)))
+    return pd.Series(np.select([ok, recent.to_numpy()], ["investable", "recent"], "unusable"), index=listed)
+
+
 @lru_cache(maxsize=256)
-def counts(region: str, sectors: tuple[str, ...], esg: str) -> dict[str, int]:
-    """Stocks of a region today: investable candidates, excluded by the screen, kept."""
-    n = len(investable(last_window(region, sectors)))
+def _region_counts(region: str, sectors: tuple[str, ...], esg: str) -> dict[str, int]:
+    """stock_counts() of one region."""
+    status = _region_status(region, sectors)
+    n = int((status == "investable").sum())
     out = n_excluded(n, esg)
-    return {"candidates": n, "excluded": out, "kept": n - out}
+    return {"listed": len(status), "investable": n, "recent": int((status == "recent").sum()),
+            "unusable": int((status == "unusable").sum()), "excluded_esg": out, "kept": n - out}
+
+
+@lru_cache(maxsize=256)
+def stock_counts(regions: tuple[str, ...], sectors: tuple[str, ...], esg: str) -> dict[str, int]:
+    """The single source of every number of stocks shown in the app, for the chosen regions and sectors:
+
+    listed        stocks of the universe (esg_universe)
+    investable    eligible at the last rebalancing: a complete return window and a moving price
+    recent        not investable yet: their history starts inside the last window (listed less than a year ago)
+    unusable      neither: no usable price in the last window
+    excluded_esg  investable stocks removed by the ESG screen (the worst X% of each region)
+    kept          investable stocks left after the screen: the stocks the portfolio holds
+    """
+    per_region = [_region_counts(r, tuple(sectors), esg) for r in regions]
+    return {k: sum(c[k] for c in per_region) for k in COUNT_KEYS}
+
+
+def stock_names(regions: tuple[str, ...], sectors: tuple[str, ...], status: str) -> list[str]:
+    """Names of the listed stocks with a status ("recent" or "unusable"), classified as in stock_counts."""
+    names = data.stocks()["name"]
+    return [names[a] for r in regions for a, s in _region_status(r, tuple(sectors)).items() if s == status]
+
+
+def index_counts() -> dict[str, int]:
+    """Number of indices in each non-equity sleeve (bonds, commodities)."""
+    return {s: data.sleeve_tail(s).shape[1] for s in data.other_classes()}
 
 
 def thin_regions(regions, sectors: tuple[str, ...], esg: str) -> list[str]:
     """Regions left with fewer stocks than config.MIN_STOCKS_PER_SLEEVE."""
-    return [r for r in regions if counts(r, tuple(sectors), esg)["kept"] < cfg.MIN_STOCKS_PER_SLEEVE]
+    return [r for r in regions if stock_counts((r,), tuple(sectors), esg)["kept"] < cfg.MIN_STOCKS_PER_SLEEVE]
 
 
 def esg_score(stock_weights: pd.Series) -> float:
@@ -75,11 +118,3 @@ def esg_summary(table: pd.DataFrame) -> dict[str, float]:
     """Average and median ESG score, and the share of stocks that have a score."""
     scores = table["esg_score"]
     return {"mean": scores.mean(), "median": scores.median(), "coverage": scores.notna().mean()}
-
-
-def held_vs_listed(regions) -> pd.DataFrame:
-    """Per region: stocks in the universe vs stocks investable today (complete, non-flat window)."""
-    listed = data.stocks()["zone"].value_counts()
-    return pd.DataFrame({r: {"listed": int(listed.get(r, 0)), "held": counts(r, tuple(data.sectors()),
-                                                                            next(iter(cfg.ESG_LEVELS)))["candidates"]}
-                         for r in regions}).T

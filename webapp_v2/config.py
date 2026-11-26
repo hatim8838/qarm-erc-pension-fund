@@ -30,6 +30,7 @@ PRECOMPUTED_DIR = APP_DIR / "precomputed"
 PRECOMPUTE_INPUTS = sorted([*PROCESSED_DIR.glob(core_config.PROCESSED_FILES["returns_daily"].format(ac="*") + ".parquet"),
                             PROCESSED_DIR / "esg_universe.parquet", PROCESSED_DIR / "rf.parquet", SLEEVE_WEIGHTS_FILE])
 EQUITIES = "Equities"  # asset-class label of the regional equity sleeves
+PRICE_TICK = 0.01  # Datastream prices are rounded to the cent (the cleaning floor is core's MIN_PRICE)
 
 # --------------------------------------------------------------------------- #
 # Model (same calendar and window as the team's backtest)

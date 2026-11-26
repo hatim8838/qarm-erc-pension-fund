@@ -45,12 +45,14 @@ def first_problem(values: dict) -> str | None:
 
 
 def headline(result: dict) -> None:
-    """α in the ERC portfolio, 1 − α in the risk-free asset, and the number of holdings."""
+    """α in the ERC portfolio, 1 − α in the risk-free asset, then the holdings: stocks, bond and commodity
+    indices, each on its own."""
     alpha = result["alpha"]
+    names = {"stocks": content.STOCK_NAMES, **content.INDEX_NAMES}
     blocks.figures([
         (blocks.count_up(100 * alpha, 0, "%"), T["alpha"]),
         (blocks.count_up(100 * (1 - alpha), 0, "%"), T["rf_share"]),
-        (blocks.count_up(report.holdings_count(result)), T["holdings"]),
+        *[(blocks.count_up(n), blocks.plural(n, names[k])) for k, n in report.holdings_count(result).items()],
     ])
 
 

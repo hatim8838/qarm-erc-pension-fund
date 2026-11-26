@@ -45,7 +45,8 @@ def regions(values: dict) -> None:
     facts = {}
     for r in data.regions():
         n_countries = table.loc[table["zone"] == r, "country"].nunique()
-        facts[r] = T["region_facts"].format(n=(table["zone"] == r).sum(), c=n_countries,
+        counts = universe.stock_counts((r,), tuple(data.sectors()), next(iter(cfg.ESG_LEVELS)))
+        facts[r] = T["region_facts"].format(stocks=blocks.stock_line(counts, short=True), c=n_countries,
                                             countries="country" if n_countries == 1 else "countries")
     _pick_cards("regions", data.regions(), facts, values["regions"])
     names = {cfg.INDEX_LABELS[r]: f"{r} ({cfg.INDEX_LABELS[r]})" for r in data.regions()}
@@ -80,7 +81,7 @@ def sectors(values: dict) -> None:
     st.multiselect(J["sectors"][0], data.sectors(), default=values["sectors"], key="w_sectors",
                    on_change=_save, args=("sectors", "w_sectors"), label_visibility="collapsed")
     sec = tuple(st.session_state["sectors"])
-    blocks.figures([(blocks.count_up(universe.counts(r, sec, values["esg"])["kept"]),
+    blocks.figures([(blocks.count_up(universe.stock_counts((r,), sec, values["esg"])["kept"]),
                      T["stocks_left"].format(region=r)) for r in values["regions"]])
 
 
@@ -94,9 +95,8 @@ def esg(values: dict) -> None:
     blocks.section(*J["esg"])
     st.select_slider(T["esg_level"], list(cfg.ESG_LEVELS), value=values["esg"], format_func=esg_label,
                      key="w_esg", on_change=_save, args=("esg", "w_esg"), help=content.ESG_HELP)
-    counts = [universe.counts(r, tuple(values["sectors"]), values["esg"]) for r in values["regions"]]
-    items = [(blocks.count_up(sum(c["excluded"] for c in counts)), T["excluded"]),
-             (blocks.count_up(sum(c["kept"] for c in counts)), T["kept"])]
+    counts = universe.stock_counts(tuple(values["regions"]), tuple(values["sectors"]), values["esg"])
+    items = [(blocks.count_up(counts["excluded_esg"]), T["excluded"]), (blocks.count_up(counts["kept"]), T["kept"])]
     choices = journey.to_choices(values)
     if journey.problem("esg", values) is None:
         score, off = (universe.esg_score(portfolio.today(choices.but(esg=e, level=portfolio.FULL)))

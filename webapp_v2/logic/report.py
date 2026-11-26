@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 import config as cfg
-from logic import data
+from logic import data, universe
 from logic.portfolio import stock_weights
 from logic.risk import decomposition, min_variance, volatility
 
@@ -54,6 +54,11 @@ def strategy_lab(result: dict) -> tuple[pd.DataFrame, pd.Series]:
     return compare_ew_erc_mv(d["cov"], d["x"]), theorem_holds(result)
 
 
-def holdings_count(result: dict) -> int:
-    """Number of lines held today (stocks, bond and commodity indices; not the risk-free asset)."""
-    return int((stock_weights(result).drop(cfg.RISK_FREE, errors="ignore") > 0).sum())
+def holdings_count(result: dict) -> dict[str, int]:
+    """Lines held today, never added together: "stocks" (universe.stock_counts, the number every page shows)
+    when equities are held, then the indices held in each non-equity sleeve (not the risk-free asset)."""
+    choices, held = result["choices"], result["level1"]
+    regions = tuple(r for r in choices.regions if r in held)
+    out = {"stocks": universe.stock_counts(regions, choices.sectors, choices.esg)["kept"]} if regions else {}
+    out.update({s: int((held[s]["weights"].iloc[-1] > 0).sum()) for s in data.other_classes() if s in held})
+    return out

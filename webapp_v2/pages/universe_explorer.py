@@ -12,13 +12,9 @@ U = content.UNIVERSE
 
 
 def held_note(regions: list[str]) -> None:
-    """One line when the portfolio can hold fewer stocks than the universe lists (1-year history rule)."""
-    table = universe.held_vs_listed(regions)
-    gaps = table[table["held"] < table["listed"]]
-    if not gaps.empty:
-        pairs = ", ".join(U["held_pair"].format(held=row["held"], listed=row["listed"], region=name)
-                          for name, row in gaps.iterrows())
-        st.caption(U["held_note"].format(pairs=pairs, n=cfg.ESTIMATION_WINDOW))
+    """Stocks listed vs investable today in the chosen regions (1-year history rule), the app's usual phrase."""
+    counts = universe.stock_counts(tuple(regions), tuple(data.sectors()), next(iter(cfg.ESG_LEVELS)))
+    st.caption(U["held_note"].format(line=blocks.stock_line(counts), n=cfg.ESTIMATION_WINDOW))
 
 
 def breakdown(table: pd.DataFrame, regions: list[str]) -> None:

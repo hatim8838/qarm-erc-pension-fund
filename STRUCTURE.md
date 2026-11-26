@@ -39,7 +39,8 @@ Daily Datastream series from 31/12/1999 to 16/11/2026, in USD, as total return i
 `AUSGVAL.xlsx` (US Treasuries) is downloaded but not used: Treasuries are already about 40% of AGG.
 
 ### Cleaning rules (`clean_prices`)
-1. Prices below 1.0 are removed (Datastream gives 2 decimals, so very low index levels create fake returns).
+1. Prices below 0.20 are removed (Datastream gives 2 decimals: below 0.20 one cent is more than 5% of the price,
+   so the returns are rounding noise). Low but real levels above it are kept.
 2. Weekends and dates without any data are dropped.
 3. Stale prices at the start or end of a series (10+ identical values) are removed.
 4. Temporary spikes (+50% or -33% reversed within 5 days) are removed as data errors.

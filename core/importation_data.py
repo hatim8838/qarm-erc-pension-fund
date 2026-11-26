@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 PRICE_SUFFIX = " - TOT RETURN IND"
 
 # Cleaning rules (see clean_prices)
-MIN_PRICE = 1.0      # Datastream gives 2 decimals: below 1.0, rounding creates fake returns
+MIN_PRICE = 0.20     # Datastream gives 2 decimals: below 0.20 one cent is > 5% of the price, so the
+                     # returns are rounding noise (e.g. 0.01 -> 0.02 = +100%); above it the prices are kept
 STALE_MIN_RUN = 10   # >= 10 identical prices at the start / end of a series = no real trading
 SPIKE_JUMP = 0.5     # a spike: a move of +50% (or -33%) ...
 SPIKE_MAX_DAYS = 5   # ... reversed within 5 days ...
@@ -169,7 +170,9 @@ def clean_prices(prices: pd.DataFrame, name: str = "") -> tuple[pd.DataFrame, pd
     """Cleaning rules, in this order:
 
     1. Prices <= 0 or below ``MIN_PRICE`` -> NaN (rounding to 2 decimals makes
-       their returns meaningless, e.g. 0.01 -> 0.02 = +100%).
+       their returns meaningless, e.g. 0.01 -> 0.02 = +100%). Low but real price
+       levels above it are kept (total return indices of some Japanese stocks
+       stay below 1 for their whole history).
     2. Weekends and dates with no data at all are dropped.
     3. Stale prices at the start / end of a series -> NaN.
     4. Temporary spikes (data errors) -> NaN.

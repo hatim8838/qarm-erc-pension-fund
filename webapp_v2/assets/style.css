@@ -37,6 +37,8 @@ h1, h2, h3 { font-family: var(--font); letter-spacing: -0.02em; color: var(--ink
 @keyframes count { from { --n: 0; } }
 .count { --n: var(--to); counter-reset: n var(--n); animation: count 1.6s var(--ease) both; }
 .count::after { content: counter(n); }
+@counter-style pad3 { system: extends decimal; pad: 3 "0"; }  /* groups after a thousands separator: 1,002 */
+.count.pad3::after { content: counter(n, pad3); }
 @keyframes pulse { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
 .loader { display: flex; align-items: center; gap: 0.5rem; padding: 1.5rem; color: var(--muted); }
 .loader span { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); animation: pulse 1.2s infinite both; }

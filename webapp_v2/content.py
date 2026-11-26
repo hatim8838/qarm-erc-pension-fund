@@ -39,8 +39,8 @@ TEAM = [
 
 # "Who we are": editorial sections (heading, paragraphs). {placeholders} are filled with computed figures.
 WHO_INTRO = ("Léman Wealth Management manages pension savings around one idea: no single market should decide how "
-             "your retirement turns out. Our portfolio invests in {n_assets} assets across {n_sleeves} building "
-             "blocks, and we have tested it on {years} years of markets, from {year} to today, rebalancing it every "
+             "your retirement turns out. Our portfolio combines {n_sleeves} building blocks: {stocks}, plus "
+             "{indices}. We have tested it on {years} years of markets, from {year} to today, rebalancing it every "
              "month.")
 WHO = [
     ("Our mandate", [
@@ -91,6 +91,12 @@ FAQ = [
      "deducted, but the stock lists are today's index members (survivorship bias)."),
     ("Can I lose money?", "Yes. The Performance tab shows the largest past drawdown of your portfolio, and the "
      "Projection tab the range of outcomes over your horizon."),
+    ("Why can the portfolio hold fewer stocks than the universe lists?", "Our universe is today's {listed} members "
+     "of the {indices}, and {investable} of them are investable today. A stock needs a full year of prices before "
+     "we can estimate its risk, so the {recent} listed less than a year ago wait ({recent_names}). Prices below "
+     "{floor} are left out, because a one-cent step would be more than {tick} of the price: this excludes "
+     "{unusable_names}. Using today's members also means that companies which left these indices are missing "
+     "from the backtest (survivorship bias)."),
 ]
 
 CLASS_ROLES = {
@@ -103,7 +109,13 @@ METRIC_LABELS = {
     "max_drawdown": "Max drawdown", "tracking_error": "Tracking error vs benchmark",
     "information_ratio": "Information ratio",
 }
-LEVEL_NAMES = {1: "Cautious", 2: "Moderate", 3: "Balanced", 4: "Dynamic", 5: "Aggressive"}
+LEVEL_NAMES = {1: "Cautious", 2: "Moderate", 3: "Balanced", 4: "Dynamic", 5: "Fully invested"}
+# Stock counts: the same phrase wherever the size of the universe appears (logic.universe.stock_counts)
+STOCK_LINE = "{listed} stocks in our universe · {investable} investable today"
+STOCK_LINE_SHORT = "{listed} stocks · {investable} investable today"
+STOCK_LINE_WHY = {"recent": "{n} listed less than a year ago", "unusable": "{n} without usable prices"}
+STOCK_NAMES = ("stock", "stocks")
+INDEX_NAMES = {"Bonds": ("bond index", "bond indices"), "Commodities": ("commodity index", "commodity indices")}
 ESG_HELP = "Share of the worst-ESG stocks excluded from each region, at every monthly rebalancing."
 
 JOURNEY = {
@@ -128,7 +140,7 @@ PROBLEMS = {
 NAV_BUTTONS = {"back": "Back", "next": "Next", "select": "Select", "selected": "Selected ✓"}
 
 TEXT = {
-    "region_facts": "{n} stocks · {c} {countries}",
+    "region_facts": "{stocks} · {c} {countries}",
     "index_note": "Annual return and volatility of the official indices since {start}.",
     "class_note": "Annual return and volatility since {start}: official indices for equities and bonds, our sleeve of "
                   "three S&P GSCI sector indices for commodities.",
@@ -148,7 +160,7 @@ TEXT = {
     "computed": "Recomputed in {s:.1f} s.", "cached": "Loaded from cache (first computed in {s:.1f} s).",
     "loading": "Budgeting the risk of your portfolio…",
     "tabs": ["Allocation", "Risk contribution", "Performance", "Projection"],
-    "alpha": "ERC share α", "rf_share": "Risk-free 1 − α", "holdings": "Holdings", "esg_vs": "ESG score vs Off",
+    "alpha": "ERC share α", "rf_share": "Risk-free 1 − α", "esg_vs": "ESG score vs Off",
     "by_class": "By asset class", "by_sector": "Equities by sector",
     "benchmark": "Benchmark b", "gross_net": "Gross vs net of costs", "turnover": "Turnover at each rebalancing",
     "turnover_note": "Each bar is the share of the portfolio traded at a monthly rebalancing. It usually stays at a "
@@ -170,9 +182,8 @@ TEXT = {
 UNIVERSE = {
     "breakdown": "Investment universe breakdown", "geo": "Geographical breakdown", "industry": "Industry breakdown",
     "stocks": "Number of stocks", "counts_caption": "Breakdowns are based on stock counts, not portfolio weights.",
-    "held_note": "The portfolio can hold {pairs} today: a stock enters only with a complete {n}-day return history "
-                 "and a moving price.",
-    "held_pair": "{held} of the {listed} {region} stocks",
+    "held_note": "{line}. A stock enters the portfolio only with a complete {n}-day return history and a moving "
+                 "price.",
     "esg": "ESG analysis", "esg_mean": "Average ESG score", "esg_median": "Median ESG score",
     "esg_coverage": "ESG score coverage", "esg_hist": "ESG score distribution", "esg_axis": "ESG score",
     "companies": "Selected companies", "search": "Search for a company", "region_filter": "Filter by region",
@@ -204,8 +215,16 @@ METHOD = ("Method and limitations", [
     "business days with Ledoit-Wolf shrinkage. Long-only. A share α of your money ({low} to {high}, set by your "
     "risk level) is invested in the ERC portfolio and 1 − α in the risk-free asset.",
     "**ESG option**: exclusion of the worst {levels} ESG-scored equities in each region, at every rebalancing.",
-    "**Limits**: estimates are historical and do not guarantee future risk. Stock lists are today's index "
-    "constituents and ESG scores are a recent snapshot. Educational project, not investment advice.",
+    "**Investable stocks**: a stock enters the portfolio only with a full year of prices ({n} business days), the "
+    "window on which its risk is estimated. Of the {listed} stocks in our universe, {investable} are investable "
+    "today. {recent} were listed less than a year ago and will enter once they have a full year: {recent_names}.",
+    "**Prices too low to record real moves**: our data rounds prices to the cent, so below {floor} a one-cent step "
+    "is more than {tick} of the price and the daily moves become rounding noise. These prices are left out, which "
+    "leaves {unusable} stocks without a usable price over the last year: {unusable_names}.",
+    "**Limits**: estimates are historical and do not guarantee future risk. The stock lists are today's members "
+    "of the {indices} ({listed} stocks): companies that left these indices in the past are missing from the "
+    "backtest, a survivorship bias that makes past returns look better. ESG scores are a recent snapshot. "
+    "Educational project, not investment advice.",
 ])
 
 # "Our goals": opening paragraph, then editorial sections. A paragraph is a string, or (bold lead-in, text).
