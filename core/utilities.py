@@ -16,7 +16,7 @@ import pandas as pd
 from scipy.optimize import minimize
 from sklearn.covariance import LedoitWolf
 
-from core.config import ESTIMATION_WINDOW, REBALANCING_FREQ, TRADING_DAYS
+from core.config import ESTIMATION_WINDOW, MAX_ZERO_SHARE, REBALANCING_FREQ, TRADING_DAYS
 
 logger = logging.getLogger(__name__)
 
@@ -142,9 +142,10 @@ def rebalancing_dates(index: pd.DatetimeIndex, start, freq: str = REBALANCING_FR
 
 
 def eligible_assets(returns: pd.DataFrame, as_of, window: int = ESTIMATION_WINDOW) -> pd.Series:
-    """True for assets with a return on every one of the last ``window`` days up to ``as_of``."""
+    """True for assets with a return on every one of the last ``window`` days up to ``as_of`` and a price that
+    moves: more than ``MAX_ZERO_SHARE`` zero returns means stale prices, whose risk cannot be estimated."""
     past = returns.loc[:as_of].tail(window)
-    return past.notna().all() & (len(past) == window)
+    return past.notna().all() & (len(past) == window) & ((past == 0).mean() <= MAX_ZERO_SHARE)
 
 
 def backtest(returns: pd.DataFrame, weight_fn, start, rebalance: str = REBALANCING_FREQ) -> dict:

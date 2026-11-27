@@ -111,6 +111,7 @@ ASSET_ID_SEP: str = "|"
 # --------------------------------------------------------------------------- #
 PORTFOLIO_START: str = "2005-01-01"   # first rebalancing; AGG starts 26/09/2003 + 1-year window
 ESTIMATION_WINDOW: int = 252          # 1-year rolling estimation window (business days)
+MAX_ZERO_SHARE: float = 0.20          # a stock with more than 20% zero returns in its window is not traded enough
 # Outputs in data/processed/ start one year before the portfolio, so the first
 # estimation window (2004) is available. Cleaning and the volatility proxies
 # are computed on the full 2000-2026 history before trimming.

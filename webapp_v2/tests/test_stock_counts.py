@@ -23,11 +23,11 @@ def _html(at) -> str:
 
 
 def test_universe_counts():
-    """(1) All regions, all sectors, ESG Off: 1,108 listed, 1,102 investable, 4 listed less than a year ago and
-    2 without usable prices (Monte dei Paschi, Piraeus: price indices of 0.01-0.04, below the 0.20 floor)."""
+    """(1) All regions, all sectors, ESG Off: 1,108 listed, 1,093 investable, 4 listed less than a year ago and
+    11 without usable prices (below the 0.20 floor, or a price that did not move on more than 20% of the days)."""
     c = universe.stock_counts(*ALL)
     assert c["listed"] == len(data.stocks()) == 1108
-    assert c["investable"] == 1102 and c["recent"] == 4 and c["unusable"] == 2
+    assert c["investable"] == 1093 and c["recent"] == 4 and c["unusable"] == 11
     assert c["listed"] == c["investable"] + c["recent"] + c["unusable"]
     assert c["excluded_esg"] == 0 and c["kept"] == c["investable"]
     assert c == {k: sum(universe.stock_counts((r,), *ALL[1:])[k] for r in data.regions()) for k in c}
@@ -111,7 +111,10 @@ def test_method_and_faq_explain_the_exclusions():
     """The method box and the FAQ name the stocks left out, with computed numbers only (no digit in the text)."""
     regions, sectors = ALL[:2]
     assert len(universe.stock_names(regions, sectors, "recent")) == universe.stock_counts(*ALL)["recent"]
-    assert universe.stock_names(regions, sectors, "unusable") == ["BANCA MONTE DEI PASCHI", "PIRAEUS BANK"]
+    assert universe.stock_names(regions, sectors, "unusable") == [
+        "BANCA MONTE DEI PASCHI", "RENESAS ELECTRONICS", "SOFTBANK", "NTT", "SUMITOMO MITSUI TRUST GROUP",
+        "JAPAN POST HOLDINGS", "SUNTORY BEVERAGE & FOOD", "WEST JAPAN RAILWAY", "MITSUBISHI CHEMICAL GROUP", "EUROBANK",
+        "PIRAEUS BANK"]
     new_text = [*content.METHOD[1][2:], content.FAQ[-1][1]]
     assert not any(re.search(r"\d", t) for t in new_text)
     values = blocks.universe_values()

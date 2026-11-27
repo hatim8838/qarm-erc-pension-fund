@@ -34,7 +34,7 @@ def performance_tab(result: dict, net: pd.Series, alpha: float) -> None:
     mine = net.rename("Your portfolio")
     bench = performance.with_alpha(data.benchmarks()[benchmark], alpha, data.risk_free_daily()).rename(benchmark)
     both = pd.concat([mine, bench], axis=1)
-    blocks.section(T["bench_title"].format(b=benchmark, alpha=blocks.pct(alpha, 0)))
+    blocks.section(T["bench_title"].format(b=benchmark, rf=blocks.pct(1 - alpha, 0)) if alpha < 1 else benchmark)
     charts.lines(performance.wealth(both), log_y=True, key="perf_wealth")
     table = performance.metrics_table(both)[["ann_return", "ann_volatility", "sharpe", "max_drawdown"]]
     # tracking error and IR compare a portfolio with the benchmark: empty on the benchmark row itself
@@ -44,7 +44,7 @@ def performance_tab(result: dict, net: pd.Series, alpha: float) -> None:
         table.loc[mine.name, col] = value
     tables.show(table.rename(columns=content.METRIC_LABELS), plain={content.METRIC_LABELS["sharpe"],
                 content.METRIC_LABELS["information_ratio"]})
-    st.caption(T["bench_note"].format(alpha=blocks.pct(alpha, 0), rf=blocks.pct(1 - alpha, 0)))
+    st.caption(T["bench_note"].format(rf=blocks.pct(1 - alpha, 0)))
     blocks.section(T["gross_net"])
     gross = pd.concat([result["returns"].rename("Gross"), net.rename("Net")], axis=1)
     costs = performance.metrics_table(gross)[["ann_return", "sharpe"]]

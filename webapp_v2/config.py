@@ -23,6 +23,7 @@ CORE_ERC = "ERC"  # core's two-level ERC backtest (the baseline to reproduce)
 CORE_SLEEVE_PREFIX = "ERC "  # core's level-1 ERC backtest of each sleeve: "ERC <sleeve>"
 COMPOSITE_BENCHMARKS = ["60/40", "1/N"]  # pre-computed in portfolio_returns.parquet
 INDEX_LABELS = core_config.BENCHMARK_LABELS  # benchmark file column -> index name
+ERC_ON_INDICES = "ERC indices"  # core's survivorship robustness check (portfolio_returns column)
 BOND_INDEX = "AGG"  # index shown for the bond sleeve
 ASSET_ID_SEP = core_config.ASSET_ID_SEP
 # Precomputed results (scripts/precompute.py), used only while these inputs are unchanged

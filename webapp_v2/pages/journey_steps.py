@@ -5,8 +5,9 @@ import streamlit as st
 
 import config as cfg
 import content
+import services
 from logic import data, journey, performance, portfolio, universe
-from ui import blocks, charts
+from ui import blocks, charts, tables
 
 T, J, B = content.TEXT, content.JOURNEY, content.NAV_BUTTONS
 
@@ -119,3 +120,21 @@ def profile_step(values: dict) -> None:
     alpha = cfg.ALPHAS[st.session_state["level"]]
     st.markdown(T["level_line"].format(level=st.session_state["level"], alpha=blocks.pct(alpha, 0),
                                        rf=blocks.pct(1 - alpha, 0)))
+    if all(journey.problem(s, values) is None for s in ("regions", "classes", "sectors", "esg")):
+        _levels_table(journey.to_choices(values), st.session_state["level"])
+
+
+def _levels_table(choices: portfolio.Choices, chosen: int) -> None:
+    """What each risk level would have meant for the portfolio built in steps 3a-3d (backtest, net of costs):
+    the information a pension fund's committee needs to choose, instead of a questionnaire."""
+    series = {}
+    for level in cfg.ALPHAS:
+        result, _, _ = services.build_timed(choices.but(level=level))
+        name = f"{level} · {content.LEVEL_NAMES[level]}" + (T["levels_yours"] if level == chosen else "")
+        series[name] = portfolio.net_returns(result, cfg.TRANSACTION_COST_BPS)
+    returns = pd.DataFrame(series)
+    table = performance.metrics_table(returns)[["ann_return", "ann_volatility", "max_drawdown"]]
+    table.insert(0, "invested", list(cfg.ALPHAS.values()))
+    blocks.section(T["levels_title"])
+    tables.show(table.rename(columns={**content.METRIC_LABELS, "invested": T["levels_invested"]}))
+    st.caption(T["levels_note"].format(start=returns.index[0].year, end=returns.index[-1].year))

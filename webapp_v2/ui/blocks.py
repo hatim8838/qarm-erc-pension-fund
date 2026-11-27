@@ -11,8 +11,9 @@ import streamlit as st
 
 import config as cfg
 import content
+from core.config import MAX_ZERO_SHARE
 from core.importation_data import MIN_PRICE
-from logic import data, universe
+from logic import data, performance, universe
 
 
 def pct(value: float, decimals: int = 1) -> str:
@@ -68,7 +69,18 @@ def universe_values() -> dict[str, str]:
     return {**{k: f"{counts[k]:,}" for k in ("listed", "investable", "recent", "unusable")},
             **{f"{s}_names": join_and(universe.stock_names(regions, sectors, s)) for s in ("recent", "unusable")},
             "floor": f"{MIN_PRICE:.2f}", "tick": pct(cfg.PRICE_TICK / MIN_PRICE, 0),
-            "indices": join_and([cfg.INDEX_LABELS[r] for r in regions])}
+            "indices": join_and([cfg.INDEX_LABELS[r] for r in regions]), "zero_share": pct(MAX_ZERO_SHARE, 0),
+            **robustness_values()}
+
+
+@lru_cache(maxsize=1)
+def robustness_values() -> dict[str, str]:
+    """Survivorship-bias check: ERC on today's stocks vs the same ERC on the official indices, and the 60/40."""
+    m = performance.metrics_table(data.portfolio_returns()[["ERC", cfg.ERC_ON_INDICES, "60/40"]])
+    erc, idx, bench = (m.loc[c] for c in ("ERC", cfg.ERC_ON_INDICES, "60/40"))
+    return {"b_name": "60/40", "erc_sharpe": f"{erc.sharpe:.2f}", "idx_sharpe": f"{idx.sharpe:.2f}", "b_sharpe": f"{bench.sharpe:.2f}",
+            "vol_cut": pct(1 - idx.ann_volatility / bench.ann_volatility, 0),
+            "idx_dd": pct(idx.max_drawdown, 0), "b_dd": pct(bench.max_drawdown, 0)}
 
 
 def figures(items: list[tuple[str, str]]) -> None:

@@ -38,8 +38,8 @@ TEAM = [
 ]
 
 # "Who we are": editorial sections (heading, paragraphs). {placeholders} are filled with computed figures.
-WHO_INTRO = ("Léman Wealth Management manages pension savings around one idea: no single market should decide how "
-             "your retirement turns out. Our portfolio combines {n_sleeves} building blocks: {stocks}, plus "
+WHO_INTRO = ("Léman Wealth Management manages the assets of pension funds around one idea: no single market should "
+             "decide whether a fund can pay its pensions. Our portfolio combines {n_sleeves} building blocks: {stocks}, plus "
              "{indices}. We have tested it on {years} years of markets, from {year} to today, rebalancing it every "
              "month.")
 WHO = [
@@ -47,25 +47,24 @@ WHO = [
         "We run a multi-asset pension fund. Equities are held in regional sleeves, alongside US investment-grade "
         "bonds and a basket of commodities. Every month we rebuild the portfolio from the latest data and trade "
         "back to the new weights.",
-        "Clients can add an ESG screen that removes the worst-rated stocks of each region before the portfolio is "
-        "built, and they choose how much risk they want to take. Everything else follows the same rules for "
-        "everyone.",
+        "Each fund can add an ESG screen that removes the worst-rated stocks of each region before the portfolio "
+        "is built, and sets the level of risk it can bear. Everything else follows the same rules for every fund.",
     ]),
     ("How we invest", [
         "Our method starts from risk instead of money. With Equal Risk Contribution, every building block of the "
         "portfolio, each equity region, bonds and commodities, adds the same share to its overall risk. Volatile "
         "assets receive less money and calmer ones receive more, so no single market dominates.",
     ]),
-    ("Your level of risk", [
-        "Sharing risk equally says nothing about how much risk you take overall. That part is yours: you pick "
-        "one of five risk levels, which sets the share of your money invested in the ERC portfolio, from {low} "
-        "to {high}. The rest earns the risk-free rate.",
+    ("Your fund's level of risk", [
+        "Sharing risk equally says nothing about how much risk the fund takes overall. That decision belongs to "
+        "your investment committee: it picks one of five risk levels, which sets the share of the assets invested "
+        "in the ERC portfolio, from {low} to {high}. The rest earns the risk-free rate.",
     ]),
     ("Working with us", [
-        "Building your portfolio takes a few minutes in the Client journey. You tell us which regions, asset "
-        "classes and sectors you want to hold, whether to apply an ESG screen, and your risk level.",
+        "Building your fund's portfolio takes a few minutes in the Client journey. You tell us which regions, "
+        "asset classes and sectors the fund should hold, whether to apply an ESG screen, and its risk level.",
         "We then budget the risk and show you the result straight away: the allocation, each holding's share of "
-        "risk, past performance against a benchmark, and a projection of where your savings could go. Change any "
+        "risk, past performance against a benchmark, and a projection of where the fund's assets could go. Change any "
         "choice and the portfolio updates in front of you.",
     ]),
 ]
@@ -78,24 +77,28 @@ WHY_RB = [
      "Risk-budgeting weights move slowly and keep turnover low."),
     ("A simple ESG screen", "At each rebalancing, the worst-rated stocks of each region are excluded "
      "(10, 30 or 50%); ERC then runs on the stocks that remain."),
-    ("Your risk level", "A share α goes to the ERC portfolio and 1 − α to the risk-free asset: "
-     "σ(y) = α·σ(x) and the Sharpe ratio stays the same."),
+    ("Your risk level", "Part of the fund goes to the ERC portfolio and the rest to the risk-free asset: "
+     "risk goes down with the invested share, while the diversification stays the same."),
 ]
 
 FAQ = [
     ("What is Equal Risk Contribution?", "A portfolio where each component adds the same amount to total "
      "volatility: volatile assets get less capital, calm ones more."),
-    ("Why add a risk-free asset?", "It scales risk without changing the mix: σ(y) = α·σ(x) and the Sharpe "
-     "ratio stays the same."),
-    ("Is the backtest realistic?", "Weights only use past data and are held from the next day; costs are "
-     "deducted, but the stock lists are today's index members (survivorship bias)."),
+    ("Why add a risk-free asset?", "It sets the level of risk without changing the mix: holding less in the ERC "
+     "portfolio lowers risk in proportion, and the return per unit of risk stays the same."),
+    ("Is the backtest realistic?", "Weights only use past data and are held from the next day, and trading costs "
+     "are deducted. Two biases remain. Our stock lists are today's index members, so companies that left the "
+     "indices are missing (survivorship bias): to measure it, we rebuilt the same ERC on the official indices, "
+     "which have no such bias. Its Sharpe ratio falls from {erc_sharpe} to {idx_sharpe}, close to the 60/40 "
+     "({b_sharpe}), with {vol_cut} less volatility and a smaller worst loss ({idx_dd} against {b_dd}). And ESG "
+     "scores are today's, applied to the whole history (look-ahead bias)."),
     ("Can I lose money?", "Yes. The Performance tab shows the largest past drawdown of your portfolio, and the "
      "Projection tab the range of outcomes over your horizon."),
     ("Why can the portfolio hold fewer stocks than the universe lists?", "Our universe is today's {listed} members "
      "of the {indices}, and {investable} of them are investable today. A stock needs a full year of prices before "
      "we can estimate its risk, so the {recent} listed less than a year ago wait ({recent_names}). Prices below "
-     "{floor} are left out, because a one-cent step would be more than {tick} of the price: this excludes "
-     "{unusable_names}. Using today's members also means that companies which left these indices are missing "
+     "{floor} are left out, because a one-cent step would be more than {tick} of the price, and so are stocks "
+     "whose price did not move on more than {zero_share} of the days: this excludes {unusable_names}. Using today's members also means that companies which left these indices are missing "
      "from the backtest (survivorship bias)."),
 ]
 
@@ -124,9 +127,9 @@ JOURNEY = {
     "sectors": ("3c · Which sectors?", "Applied to the stocks of every region you picked."),
     "esg": ("3d · ESG preference", "Exclude the worst ESG-rated stocks of each region before ERC runs: the ESG "
                                     "screen decides what you own, ERC how the risk is spread."),
-    "profile": ("3e · Your risk level", "Choose α, the share invested in the ERC portfolio; the rest earns the "
-                                        "risk-free rate. This scales risk (σ = α·σ_ERC) without changing the "
-                                        "mix, so the Sharpe ratio stays the same."),
+    "profile": ("3e · Your risk level", "Choose the share of the fund invested in the ERC portfolio; the rest "
+                                        "earns the risk-free rate. A lower level means less risk, with the same "
+                                        "diversification."),
     "portfolio": ("3f · Your portfolio", "{level} · α = {alpha} in ERC · ESG screen {esg} · {n} sleeves"),
 }
 STEP_NAMES = {"regions": "Regions", "classes": "Asset classes", "sectors": "Sectors", "esg": "ESG",
@@ -148,12 +151,18 @@ TEXT = {
     "team": "The team", "faq": "Questions",
     "closing_cta": "Ready to see your portfolio?",
     "why_rb": "Why risk budgeting", "lab": "EW vs ERC on our sleeves today",
-    "lab_sub": "Risk contributions RC*_i of equal weights and of ERC on the same Ledoit-Wolf Σ̂ ({date}).",
-    "theorem": "σ(x_mv) ≤ σ(x_erc) ≤ σ(x_ew) held at {share} of our {n} monthly rebalancings.",
+    "lab_sub": "Risk contributions of equal weights and of ERC, on the same Ledoit-Wolf covariance ({date}).",
+    "theorem": "The ERC portfolio was less risky than equal weights and riskier than minimum variance at {share} "
+               "of our {n} monthly rebalancings.",
     "excluded": "stocks excluded at the latest rebalancing", "kept": "stocks kept", "esg_now": "Portfolio ESG score",
     "esg_delta": "{delta:+.1f} vs Off", "esg_level": "ESG screen",
     "level_slider": "Risk level", "level_format": "{level} · {name} · α {alpha}",
     "level_line": "Level {level} · {alpha} in the ERC portfolio · {rf} risk-free",
+    "levels_title": "What each level would have meant", "levels_invested": "Invested in ERC",
+    "levels_yours": " (your choice)",
+    "levels_note": "Backtest {start}–{end} of the portfolio built in the previous steps, after trading costs. "
+                   "A higher level brings more return and deeper losses: the committee chooses the level of risk "
+                   "the fund can bear.",
     "adjust": "Adjust my choices",
     "cost_note": "Trading costs are set at {bps} bps of the amount traded at each rebalancing, a typical level for "
                  "an institutional investor in liquid markets. They reduce the annual return by {drag}.",
@@ -168,14 +177,11 @@ TEXT = {
                      "2020, and in 2021 when the Covid crash left the one-year estimation window.",
     "weights_time": "Weights at each monthly rebalancing", "expected": "Expected annual return",
     "expected_vol": "Expected volatility",
-    "bench_title": "{b} with your α = {alpha}",
-    "bench_note": "Fair comparison: the benchmark gets the same choice as you, α = {alpha} in the benchmark and "
-                  "{rf} in the risk-free asset. 60/40 = 60% S&P 500 + 40% US bonds (AGG); 1/N = equal weights on "
-                  "the six sleeve indices; both rebalanced monthly. Judge on the Sharpe ratio and the max drawdown: "
-                  "a riskier benchmark can end higher in a strong equity market.",
-    "ci_note": "± {margin} is the 95% interval of the estimated mean, μ ± 1.96·σ/√T, over T = {years:.0f} years "
-               "of backtest: "
-               "the estimation error of the mean, not the range of future returns.",
+    "bench_title": "{b} with the same cash share ({rf})",
+    "bench_note": "The benchmark holds the same {rf} in the risk-free asset as your portfolio. 60/40: 60% S&P 500 "
+                  "and 40% US bonds (AGG). 1/N: equal weights on the six sleeve indices. Both rebalanced monthly.",
+    "ci_note": "± {margin} is the 95% confidence interval of the average return, estimated over {years:.0f} years "
+               "of backtest: it measures the uncertainty of the average, not the range of future returns.",
     "horizon": "Horizon (years)", "fan": "Value of {start} invested (median, 25–75% and 5–95% bands)",
 }
 
@@ -193,7 +199,7 @@ UNIVERSE_COLUMNS = {"name": "Company", "zone": "Region", "country": "Country", "
                     "sector": "Sector", "esg_score": "ESG Score", "isin": "ISIN"}
 
 COMPOSITION = {
-    "inside": "Inside your ERC portfolio (α = {alpha} of your money)", "total": "Show as % of my total money",
+    "inside": "Inside the ERC portfolio ({alpha} of the fund)", "total": "Show as % of the whole fund",
     "donut": "Capital allocation by sleeve", "n_sleeves": "{n} sleeves", "table": "Sleeves",
     "insight": "The portfolio holds <b>{top_w}</b> of its capital in <b>{top}</b> and only <b>{low_w}</b> in "
                "<b>{low}</b>, yet each sleeve contributes <b>{rc}</b> of the total risk. Low-volatility sleeves "
@@ -212,46 +218,51 @@ BAR_NAMES = {"weight": "Capital weight", "rc": "Risk contribution", "inner_weigh
 METHOD = ("Method and limitations", [
     "**Method**: two-level Equal Risk Contribution: inside each region first, then across the regions, bonds and "
     "commodities, so that every component contributes the same share of risk. Risk is estimated on the last {n} "
-    "business days with Ledoit-Wolf shrinkage. Long-only. A share α of your money ({low} to {high}, set by your "
-    "risk level) is invested in the ERC portfolio and 1 − α in the risk-free asset.",
+    "business days with Ledoit-Wolf shrinkage. Long-only. A share of the fund ({low} to {high}, set by its "
+    "risk level) is invested in the ERC portfolio, the rest in the risk-free asset.",
     "**ESG option**: exclusion of the worst {levels} ESG-scored equities in each region, at every rebalancing.",
     "**Investable stocks**: a stock enters the portfolio only with a full year of prices ({n} business days), the "
     "window on which its risk is estimated. Of the {listed} stocks in our universe, {investable} are investable "
     "today. {recent} were listed less than a year ago and will enter once they have a full year: {recent_names}.",
     "**Prices too low to record real moves**: our data rounds prices to the cent, so below {floor} a one-cent step "
-    "is more than {tick} of the price and the daily moves become rounding noise. These prices are left out, which "
+    "is more than {tick} of the price and the daily moves become rounding noise. These prices are left out, and so "
+    "are stocks whose price did not move on more than {zero_share} of the days of the year (stale prices), which "
     "leaves {unusable} stocks without a usable price over the last year: {unusable_names}.",
     "**Limits**: estimates are historical and do not guarantee future risk. The stock lists are today's members "
     "of the {indices} ({listed} stocks): companies that left these indices in the past are missing from the "
-    "backtest, a survivorship bias that makes past returns look better. ESG scores are a recent snapshot. "
+    "backtest, a survivorship bias that makes past returns look better. Rebuilt on the official indices, the ERC "
+    "portfolio has a Sharpe ratio of {idx_sharpe} instead of {erc_sharpe} ({b_name}: {b_sharpe}). ESG scores are "
+    "today's, applied to the whole history: a look-ahead bias. "
     "Educational project, not investment advice.",
 ])
 
 # "Our goals": opening paragraph, then editorial sections. A paragraph is a string, or (bold lead-in, text).
-GOALS_INTRO = ("Our goal is simple to state and hard to achieve: give every pension client a portfolio whose risk is "
-               "spread evenly across markets, and whose overall risk matches who they are.")
+GOALS_INTRO = ("Our goal is simple to state and hard to achieve: give every pension fund a portfolio whose risk is "
+               "spread evenly across markets, and whose overall risk matches what the fund can bear.")
 GOALS = [
     ("What we aim for", [
         "A pension is built over decades, so the portfolio has to hold up in every kind of market, not only in the "
         "good years. Spreading risk evenly across regions, bonds and commodities means that no single market can "
         "decide the outcome on its own.",
-        "The other half of the goal is personal. Two savers can need very different levels of risk, depending on "
-        "their horizon and on how they live through a loss. That is why each client chooses their own risk level, "
-        "and why we review and adjust the portfolio every month as markets change.",
+        "The other half of the goal is specific to each fund. Two pension funds can bear very different levels of "
+        "risk, depending on their reserves and on how many of their members already draw a pension. That is why "
+        "each fund chooses its own risk level, and why we review and adjust the portfolio every month as markets "
+        "change.",
     ]),
     ("How we measure success", [
-        "Success, for a pension, is not beating the market every year. It is reaching retirement with savings "
-        "that grew steadily, without losses so deep that they force you to change your plans.",
-        "So we judge ourselves on what matters to you: risk that stays close to the level you chose, smaller "
+        "Success, for a pension fund, is not beating the market every year. It is growing the assets steadily "
+        "enough to pay every pension, without losses so deep that the fund has to cut benefits or ask for more "
+        "contributions.",
+        "So we judge ourselves on what matters to the fund: risk that stays close to the level it chose, smaller "
         "falls when markets are in trouble, and growth that builds up over the long run. We show these results "
-        "openly in your portfolio, next to a classic portfolio, so you can judge for yourself.",
+        "openly in the portfolio, next to a classic portfolio, so the fund can judge for itself.",
     ]),
     ("Responsible investing", [
-        "You decide how much sustainability matters in your portfolio. With our ESG screen, the companies with the "
-        "weakest environmental, social and governance ratings in each region are left out before your portfolio "
-        "is built, and you choose how strict the screen is.",
-        "Your portfolio stays diversified whatever you choose: risk is still spread evenly over the companies that "
-        "remain, and you can see straight away how the screen changes your portfolio's ESG score.",
+        "Each fund decides how much sustainability matters in its portfolio. With our ESG screen, the companies with the "
+        "weakest environmental, social and governance ratings in each region are left out before the portfolio "
+        "is built, and the fund chooses how strict the screen is.",
+        "The portfolio stays diversified whatever the choice: risk is still spread evenly over the companies that "
+        "remain, and the fund sees straight away how the screen changes its ESG score and what it costs.",
     ]),
     ("How we work with you", [
         "Managing a pension fund's assets is a long-term mandate built on trust. This is what your fund can expect "

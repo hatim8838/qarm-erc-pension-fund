@@ -105,6 +105,18 @@ def benchmark_returns(returns: dict[str, pd.DataFrame]) -> pd.DataFrame:
     })
 
 
+def erc_on_indices(returns: dict[str, pd.DataFrame]) -> pd.Series:
+    """Robustness check for survivorship bias: the same two-level ERC, but each equity sleeve is its official
+    index (S&P 500, MSCI EMU, MSCI Pacific, MSCI EM EMEA) instead of today's index members."""
+    bench = returns["benchmarks"]
+    frames = {zone: bench[[zone]] for zone in ZONES}
+    frames["Bonds"], frames["Commodities"] = returns["bonds"], returns["commodities"]
+    frames = {s: df.add_prefix(s + ASSET_ID_SEP) for s, df in frames.items()}
+    R = pd.concat(frames.values(), axis=1).sort_index()
+    sleeves = {s: list(df.columns) for s, df in frames.items()}
+    return backtest(R, lambda W: two_level_weights(W, sleeves), PORTFOLIO_START)["returns"]
+
+
 def run_portfolios(data: dict, returns: dict[str, pd.DataFrame]) -> None:
     R, sleeves = asset_returns(returns)
     rf = data["rf"]["rf_daily"]
@@ -126,6 +138,8 @@ def run_portfolios(data: dict, returns: dict[str, pd.DataFrame]) -> None:
         logger.info("Backtest: ERC within %s", sleeve)
         port[f"ERC {sleeve}"] = backtest(R[cols], lambda W: erc_weights(covariance_matrix(W)),
                                          PORTFOLIO_START)["returns"]
+    logger.info("Backtest: ERC on the official indices (survivorship robustness check)")
+    port["ERC indices"] = erc_on_indices(returns)
     port = port.join(benchmark_returns(returns))
     index_names = {"US": "S&P 500", "Eurozone": "MSCI EMU", "Pacific": "MSCI Pacific",
                    "EM EMEA": "MSCI EM EMEA", "Commodities": "S&P GSCI"}
