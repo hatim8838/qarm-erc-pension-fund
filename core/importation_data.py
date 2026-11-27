@@ -7,7 +7,6 @@ returns one dictionary with all the data. Nothing in ``data/raw/`` is written.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -204,7 +203,7 @@ def clean_prices(prices: pd.DataFrame, name: str = "") -> tuple[pd.DataFrame, pd
 
 
 # --------------------------------------------------------------------------- #
-# Stock table (sector + ESG), used by core/esg.py and the app
+# Stock table (sector + ESG score), used by the app
 # --------------------------------------------------------------------------- #
 def assign_zones(esg: pd.DataFrame) -> pd.DataFrame:
     """Add ``country`` (ISIN prefix) and ``zone`` (= the source region)."""
@@ -281,7 +280,7 @@ def load_all() -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# Read side: what the Streamlit pages use (only reads data/processed/)
+# Read side: what the web app uses (only reads data/processed/)
 # --------------------------------------------------------------------------- #
 def read_processed(kind: str, asset_class: str, columns: list[str] | None = None) -> pd.DataFrame:
     """Read one output of ``compute_erc.py``: ``kind`` is a key of

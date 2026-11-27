@@ -1,10 +1,10 @@
-"""Returns, volatility, risk budgeting (ERC), backtest and performance metrics.
+"""Returns, risk budgeting (ERC), backtest and performance metrics.
 
-- returns:        simple_returns, excess_returns, rolling_volatility
+- returns:        simple_returns
 - risk budgeting: covariance_matrix, risk_contributions, risk_budget_weights,
                   erc_weights, two_level_weights
 - backtest:       rebalancing_dates, eligible_assets, backtest
-- metrics:        drawdown, performance_metrics, period_performance
+- metrics:        drawdown, performance_metrics
 """
 
 from __future__ import annotations
@@ -22,27 +22,14 @@ logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------- #
-# Returns and volatility
+# Returns
 # --------------------------------------------------------------------------- #
-def simple_returns(prices: pd.DataFrame | pd.Series, freq: str = "D") -> pd.DataFrame | pd.Series:
-    """Simple returns ``R_t = P_t / P_{t-1} - 1`` (daily ``"D"`` or month-end ``"M"``).
+def simple_returns(prices: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Series:
+    """Daily simple returns ``R_t = P_t / P_{t-1} - 1``.
 
     No return is computed across a missing price (``fill_method=None``).
     """
-    if freq == "M":
-        prices = prices.resample("ME").last()
     return prices.pct_change(fill_method=None)
-
-
-def excess_returns(returns: pd.DataFrame | pd.Series, rf_daily: pd.Series) -> pd.DataFrame | pd.Series:
-    """Daily excess returns ``R_t - rf_t``."""
-    rf = rf_daily.reindex(returns.index).fillna(0.0)
-    return returns.sub(rf, axis=0) if isinstance(returns, pd.DataFrame) else returns - rf
-
-
-def rolling_volatility(returns: pd.DataFrame | pd.Series, window: int = ESTIMATION_WINDOW):
-    """Annualised 1-year rolling volatility ``std(R) * sqrt(252)`` (same window as the ERC)."""
-    return returns.rolling(window, min_periods=window // 2).std() * np.sqrt(TRADING_DAYS)
 
 
 # --------------------------------------------------------------------------- #
@@ -102,26 +89,18 @@ def erc_weights(cov: pd.DataFrame) -> pd.Series:
     return risk_budget_weights(cov)
 
 
-def two_level_weights(
-    window: pd.DataFrame, sleeves: dict[str, list[str]], esg_budgets: dict[str, pd.Series] | None = None
-) -> pd.Series:
+def two_level_weights(window: pd.DataFrame, sleeves: dict[str, list[str]]) -> pd.Series:
     """Two-level ERC on one estimation window.
 
-    1. Within each sleeve: ERC weights (or ESG risk budgets for the equity
-       sleeves; stocks without a budget are left out).
+    1. Within each sleeve: ERC weights.
     2. Across sleeves: ERC on the sleeve returns (window returns x sleeve weights).
     3. Weight of an asset = sleeve weight x weight within the sleeve.
     """
     inner = {}
     for sleeve, cols in sleeves.items():
         cols = [c for c in cols if c in window.columns]
-        budgets = None
-        if esg_budgets and sleeve in esg_budgets:
-            budgets = esg_budgets[sleeve].reindex(cols).dropna()
-            cols = list(budgets.index)
-            budgets = budgets / budgets.sum()
         if cols:
-            inner[sleeve] = risk_budget_weights(covariance_matrix(window[cols]), budgets)
+            inner[sleeve] = erc_weights(covariance_matrix(window[cols]))
     sleeve_returns = pd.DataFrame({s: window[w.index] @ w for s, w in inner.items()})
     outer = erc_weights(covariance_matrix(sleeve_returns))
     weights = pd.concat([outer[s] * w for s, w in inner.items()])
@@ -195,13 +174,6 @@ def backtest(returns: pd.DataFrame, weight_fn, start, rebalance: str = REBALANCI
 # --------------------------------------------------------------------------- #
 # Performance and risk metrics
 # --------------------------------------------------------------------------- #
-CRISIS_PERIODS: dict[str, tuple[str, str]] = {
-    "Global Financial Crisis": ("2007-10-09", "2009-03-09"),
-    "Covid crash": ("2020-02-19", "2020-03-23"),
-    "2022 inflation shock": ("2022-01-03", "2022-10-12"),
-}
-
-
 def drawdown(returns: pd.Series) -> pd.Series:
     """Drawdown ``W_t / max(W) - 1`` of the wealth index."""
     wealth = (1 + returns.fillna(0)).cumprod()
@@ -226,8 +198,3 @@ def performance_metrics(returns: pd.Series, rf_daily: pd.Series | None = None) -
         out[f"ES_{level}"] = -r[r <= -var].mean()
     return pd.Series(out, name=returns.name)
 
-
-def period_performance(returns: pd.DataFrame | pd.Series, periods=CRISIS_PERIODS) -> pd.DataFrame:
-    """Cumulative return of each series over each period (crises)."""
-    df = returns.to_frame() if isinstance(returns, pd.Series) else returns
-    return pd.DataFrame({name: (1 + df.loc[a:b].fillna(0)).prod() - 1 for name, (a, b) in periods.items()}).T
