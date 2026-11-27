@@ -75,8 +75,7 @@ def test_every_page_shows_the_same_number(built):
     of universe.stock_counts, in the same phrase."""
     counts = universe.stock_counts(*ALL)
     line = blocks.stock_line(counts)
-    assert line == (f"{counts['listed']:,} stocks in our universe · {counts['investable']:,} investable today "
-                    f"({counts['recent']} listed less than a year ago, {counts['unusable']} without usable prices)")
+    assert line == f"{counts['investable']:,} stocks" == "1,093 stocks"  # one number on every page
     who = app()
     assert f"<b>{escape(line)}</b>" in _html(who)
     universe_page = app()

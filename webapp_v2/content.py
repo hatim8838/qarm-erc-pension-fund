@@ -15,7 +15,7 @@ NAV = {
 THEME_BUTTON = {"dark": ":material/light_mode:", "light": ":material/dark_mode:"}
 
 HERO = {
-    "who": ("Balance every risk.", "A multi-asset pension fund mandate built on risk budgeting.", "Build my portfolio"),
+    "who": ("Balance every risk.", "A multi-asset pension fund mandate built on Equal Risk Contribution.", "Build my portfolio"),
     "strategy": ("Risk, shared fairly.", "Why we budget risk instead of forecasting returns.", "Find my portfolio"),
     "universe": ("Know what you own.", "Every stock we can invest in, by region, industry and ESG score.", None),
     "journey": ("Build it together.", "A few short steps from your preferences to your portfolio.", None),
@@ -71,14 +71,21 @@ WHO = [
 TEAM_INTRO = "Six people, each responsible for one part of the investment process."
 
 WHY_RB = [
-    ("No return forecast", "ERC only needs the covariance matrix Σ: the weights do not depend on "
-     "expected returns, the most error-prone input."),
-    ("Stable weights", "Mean-variance weights jump with small changes in μ (estimation error). "
-     "Risk-budgeting weights move slowly and keep turnover low."),
-    ("A simple ESG screen", "At each rebalancing, the worst-rated stocks of each region are excluded "
-     "(10, 30 or 50%); ERC then runs on the stocks that remain."),
-    ("Your risk level", "Part of the fund goes to the ERC portfolio and the rest to the risk-free asset: "
-     "risk goes down with the invested share, while the diversification stays the same."),
+    ("No expected returns needed", "The ERC portfolio is independent of expected asset returns: it only uses the "
+     "covariance of the assets."),
+    ("Robust to its inputs", "Mean-variance portfolios are very sensitive to their input parameters, whereas "
+     "risk-budgeting portfolios like ERC are more robust."),
+    ("The least concentrated risk", "Among all portfolios, ERC is the one whose risk contributions are the least "
+     "concentrated."),
+]
+
+BUILD_STEPS = [
+    ("1 · Inside each sleeve", "In each region, every stock adds the same amount of risk to its sleeve. Bonds and "
+     "commodities are their own sleeves."),
+    ("2 · Across the sleeves", "The six sleeves (four equity regions, bonds, commodities) each carry one sixth of the "
+     "portfolio's risk."),
+    ("3 · The fund's level of risk", "The investment committee sets the share invested in this portfolio; the rest "
+     "stays in the risk-free asset."),
 ]
 
 FAQ = [
@@ -114,23 +121,22 @@ METRIC_LABELS = {
 }
 LEVEL_NAMES = {1: "Cautious", 2: "Moderate", 3: "Balanced", 4: "Dynamic", 5: "Fully invested"}
 # Stock counts: the same phrase wherever the size of the universe appears (logic.universe.stock_counts)
-STOCK_LINE = "{listed} stocks in our universe · {investable} investable today"
-STOCK_LINE_SHORT = "{listed} stocks · {investable} investable today"
-STOCK_LINE_WHY = {"recent": "{n} listed less than a year ago", "unusable": "{n} without usable prices"}
+STOCK_LINE = "{investable} stocks"  # one number everywhere: the stocks investable today
+STOCK_LINE_SHORT = "{investable} stocks"
 STOCK_NAMES = ("stock", "stocks")
 INDEX_NAMES = {"Bonds": ("bond index", "bond indices"), "Commodities": ("commodity index", "commodity indices")}
 ESG_HELP = "Share of the worst-ESG stocks excluded from each region, at every monthly rebalancing."
 
 JOURNEY = {
-    "regions": ("3a · Where do you want to invest?", "Pick one or more regional equity sleeves."),
-    "classes": ("3b · Which asset classes?", "Each class is a sleeve of its own. Hold at least two sleeves."),
-    "sectors": ("3c · Which sectors?", "Applied to the stocks of every region you picked."),
-    "esg": ("3d · ESG preference", "Exclude the worst ESG-rated stocks of each region before ERC runs: the ESG "
+    "regions": ("Step 1 · Where do you want to invest?", "Pick one or more regional equity sleeves."),
+    "classes": ("Step 2 · Which asset classes?", "Each class is a sleeve of its own. Hold at least two sleeves."),
+    "sectors": ("Step 3 · Which sectors?", "Applied to the stocks of every region you picked."),
+    "esg": ("Step 4 · ESG preference", "Exclude the worst ESG-rated stocks of each region before ERC runs: the ESG "
                                     "screen decides what you own, ERC how the risk is spread."),
-    "profile": ("3e · Your risk level", "Choose the share of the fund invested in the ERC portfolio; the rest "
+    "profile": ("Step 5 · Your risk level", "Choose the share of the fund invested in the ERC portfolio; the rest "
                                         "earns the risk-free rate. A lower level means less risk, with the same "
                                         "diversification."),
-    "portfolio": ("3f · Your portfolio", "{level} · α = {alpha} in ERC · ESG screen {esg} · {n} sleeves"),
+    "portfolio": ("Step 6 · Your portfolio", "{level} · α = {alpha} in ERC · ESG screen {esg} · {n} sleeves"),
 }
 STEP_NAMES = {"regions": "Regions", "classes": "Asset classes", "sectors": "Sectors", "esg": "ESG",
               "profile": "Risk level", "portfolio": "Your portfolio"}
@@ -150,14 +156,30 @@ TEXT = {
     "stocks_left": "stocks left in {region}",
     "team": "The team", "faq": "Questions",
     "closing_cta": "Ready to see your portfolio?",
-    "why_rb": "Why risk budgeting", "lab": "EW vs ERC on our sleeves today",
-    "lab_sub": "Risk contributions of equal weights and of ERC, on the same Ledoit-Wolf covariance ({date}).",
-    "theorem": "The ERC portfolio was less risky than equal weights and riskier than minimum variance at {share} "
-               "of our {n} monthly rebalancings.",
+    "problem": "The problem: money is not risk",
+    "problem_sub": "A classic 60/40 portfolio looks balanced. But stocks are far more volatile than bonds, so they "
+                   "carry almost all of its risk: when stocks fall, the whole portfolio falls.",
+    "problem_note": "60% S&P 500 and 40% US bonds (AGG), {start}–{end}: stocks are {money} of the money and {risk} "
+                    "of the risk.",
+    "answer": "Our answer: share the risk equally",
+    "answer_sub": "Equal Risk Contribution (ERC) gives each sleeve the same share of the total risk: calm assets "
+                  "get more money, volatile ones less.",
+    "answer_note": "Our portfolio with every sleeve, at the last rebalancing ({date}).",
+    "money": "Share of the money", "risk": "Share of the risk",
+    "build": "How we build the portfolio",
+    "why_rb": "Why ERC", "lab": "Equal money is not equal risk",
+    "lab_sub": "Putting the same amount in each sleeve (1/N) does not spread the risk: the most volatile sleeves "
+               "cause most of the ups and downs. ERC adjusts the amounts so that each sleeve causes the same share.",
+    "lab_vol": "Volatility with {name}",
+    "lab_note": "Each bar is a sleeve's share of the portfolio's risk on {date}. With 1/N, the Eurozone causes "
+                "{euro} of the risk and bonds {bonds}; with ERC, every sleeve causes one sixth.",
+    "theorem": "ERC was also less risky than 1/N at {share} of our {n} monthly rebalancings.",
     "excluded": "stocks excluded at the latest rebalancing", "kept": "stocks kept", "esg_now": "Portfolio ESG score",
     "esg_delta": "{delta:+.1f} vs Off", "esg_level": "ESG screen",
     "level_slider": "Risk level", "level_format": "{level} · {name} · α {alpha}",
     "level_line": "Level {level} · {alpha} in the ERC portfolio · {rf} risk-free",
+    "step": "Step {n}",
+    "no_equities": "This step only applies to equities. You did not select equities in step 2: click Next.",
     "levels_title": "What each level would have meant", "levels_invested": "Invested in ERC",
     "levels_yours": " (your choice)",
     "levels_note": "Backtest {start}–{end} of the portfolio built in the previous steps, after trading costs. "
@@ -229,7 +251,7 @@ METHOD = ("Method and limitations", [
     "are stocks whose price did not move on more than {zero_share} of the days of the year (stale prices), which "
     "leaves {unusable} stocks without a usable price over the last year: {unusable_names}.",
     "**Limits**: estimates are historical and do not guarantee future risk. The stock lists are today's members "
-    "of the {indices} ({listed} stocks): companies that left these indices in the past are missing from the "
+    "of the {indices}: companies that left these indices in the past are missing from the "
     "backtest, a survivorship bias that makes past returns look better. Rebuilt on the official indices, the ERC "
     "portfolio has a Sharpe ratio of {idx_sharpe} instead of {erc_sharpe} ({b_name}: {b_sharpe}). ESG scores are "
     "today's, applied to the whole history: a look-ahead bias. "

@@ -1,4 +1,4 @@
-"""Client journey: a stepper over 3a-3f; choices live in st.session_state."""
+"""Client journey: a stepper over steps 1-6; choices live in st.session_state."""
 
 from __future__ import annotations
 
@@ -28,12 +28,15 @@ def state() -> dict:
     return {key: st.session_state[key] for key in DEFAULTS}
 
 
+T_STEP = content.TEXT["step"]  # "Step {n}"
+
+
 def stepper(current: str, steps: list[str]) -> None:
-    """Progress bar of the active steps (done / current / to do)."""
+    """Progress bar of the six steps (done / current / to do)."""
     cells = []
     for i, step in enumerate(steps):
         css = "now" if step == current else "done" if i < steps.index(current) else ""
-        number = content.JOURNEY[step][0].split(" · ")[0]
+        number = T_STEP.format(n=i + 1)
         cells.append(f'<div class="{css}"><b>{number}</b>{content.STEP_NAMES[step]}</div>')
     st.html(f'<nav class="stepper">{"".join(cells)}</nav>')
 

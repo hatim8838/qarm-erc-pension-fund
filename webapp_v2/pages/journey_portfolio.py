@@ -1,4 +1,4 @@
-"""Client journey step 3f: the portfolio, an "Adjust my choices" panel and three analysis tabs."""
+"""Client journey step 6: the portfolio, an "Adjust my choices" panel and three analysis tabs."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def headline(result: dict) -> None:
 
 
 def render(values: dict) -> None:
-    """3f: build the client's portfolio and show it."""
+    """Step 6: build the client's portfolio and show it."""
     choices = journey.to_choices(values)
     blocks.section(content.JOURNEY["portfolio"][0], content.JOURNEY["portfolio"][1].format(
         level=content.LEVEL_NAMES[choices.level], alpha=blocks.pct(choices.alpha(), 0), esg=esg_label(choices.esg),

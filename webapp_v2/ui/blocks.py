@@ -38,12 +38,9 @@ def count_up(value: float, decimals: int = 0, suffix: str = "") -> str:
 
 
 def stock_line(counts: dict[str, int], short: bool = False) -> str:
-    """The universe phrase, e.g. "1,108 stocks in our universe · 1,104 investable today (4 listed less than a
-    year ago)", from logic.universe.stock_counts."""
-    text = (content.STOCK_LINE_SHORT if short else content.STOCK_LINE).format(
-        listed=f"{counts['listed']:,}", investable=f"{counts['investable']:,}")
-    why = [t.format(n=f"{counts[k]:,}") for k, t in content.STOCK_LINE_WHY.items() if counts[k]]
-    return f"{text} ({', '.join(why)})" if why and not short else text
+    """The universe phrase, e.g. "1,093 stocks": the stocks investable today, the one number every page shows
+    (the FAQ and the method box explain the stocks left out), from logic.universe.stock_counts."""
+    return (content.STOCK_LINE_SHORT if short else content.STOCK_LINE).format(investable=f"{counts['investable']:,}")
 
 
 def plural(n: int, names: tuple[str, str]) -> str:

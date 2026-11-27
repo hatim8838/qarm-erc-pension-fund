@@ -48,6 +48,8 @@ blocks.section(U["companies"])
 search = st.text_input(U["search"], key="uni_search")
 regions = st.multiselect(U["region_filter"], data.regions(), default=data.regions(), key="uni_regions")
 table = universe.explore(tuple(regions), search)
+# only the stocks investable today, so the page shows the same number as the rest of the app
+table = table[table["name"].isin(universe.stock_names(tuple(regions), tuple(data.sectors()), "investable"))]
 with top:
     if table.empty:
         st.info(U["empty"])

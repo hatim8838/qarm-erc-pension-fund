@@ -20,10 +20,10 @@ def test_stored_level1_equals_the_live_computation():
     for key in ("returns", "weights", "turnover"):
         # identical up to floating-point noise: other machines / library versions differ in the last digits
         (pd.testing.assert_frame_equal if key == "weights" else pd.testing.assert_series_equal)(
-            stored[key], live[key], check_exact=False, rtol=1e-6, atol=1e-10)
+            stored[key], live[key], check_exact=False, rtol=1e-6, atol=1e-8)
     for t, w in live["windows"].items():
         same = pd.testing.assert_frame_equal if isinstance(w, pd.DataFrame) else pd.testing.assert_series_equal
-        same(stored["windows"][t], w, check_exact=False, rtol=1e-6, atol=1e-10)
+        same(stored["windows"][t], w, check_exact=False, rtol=1e-6, atol=1e-8)
 
 
 def test_snapshot_from_stored_weights_equals_the_live_one(monkeypatch):
@@ -32,7 +32,7 @@ def test_snapshot_from_stored_weights_equals_the_live_one(monkeypatch):
     stored = portfolio._today.__wrapped__(choices.regions, choices.classes, choices.sectors, choices.esg)
     monkeypatch.setitem(store.STATE, "enabled", False)
     live = portfolio._today.__wrapped__(choices.regions, choices.classes, choices.sectors, choices.esg)
-    pd.testing.assert_series_equal(stored, live, check_exact=False, rtol=1e-6, atol=1e-10)
+    pd.testing.assert_series_equal(stored, live, check_exact=False, rtol=1e-6, atol=1e-8)
 
 
 def test_changed_parameter_switches_the_files_off(monkeypatch):

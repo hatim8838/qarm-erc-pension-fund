@@ -11,10 +11,9 @@ STOCK_STEPS = {"sectors", "esg"}  # only meaningful when equities are held
 
 
 def active_steps(classes) -> list[str]:
-    """Steps shown to the client: sectors and ESG are skipped without equities."""
-    if cfg.EQUITIES in classes:
-        return list(STEPS)
-    return [s for s in STEPS if s not in STOCK_STEPS]
+    """Steps shown to the client: always all six, so the path is visible from the start (without equities,
+    the sectors and ESG steps only say that they do not apply)."""
+    return list(STEPS)
 
 
 def to_choices(state: dict) -> Choices:
@@ -30,8 +29,10 @@ def problem(step: str, state: dict) -> str | None:
         return "no_region"
     if step == "classes" and len(client_sleeves(choices)) < 2:
         return "two_sleeves"
-    if step == "sectors" and not choices.sectors:
+    if step == "sectors" and cfg.EQUITIES in choices.classes and not choices.sectors:
         return "no_sector"
+    if step in STOCK_STEPS and cfg.EQUITIES not in choices.classes:  # nothing to choose without equities
+        return None
     if step in STOCK_STEPS and universe.thin_regions(choices.regions, choices.sectors, choices.esg):
         return "thin_sleeve"
     return None

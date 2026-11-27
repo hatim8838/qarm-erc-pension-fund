@@ -31,12 +31,15 @@ def test_universe_page_follows_the_filters():
     """AppTest: the region filter and the search change the table and the "N companies displayed" line."""
     at = app()
     at.switch_page(cfg.PAGES["universe"]).run()
-    assert len(at.dataframe[0].value) == len(data.stocks())
+    # only the stocks investable today: the same number as on every other page
+    assert len(at.dataframe[0].value) == universe.stock_counts(tuple(data.regions()), tuple(data.sectors()),
+                                                               "Off")["investable"]
     at.multiselect(key="uni_regions").set_value(["Pacific"]).run()
-    assert len(at.dataframe[0].value) == (data.stocks()["zone"] == "Pacific").sum()
+    pacific = universe.stock_counts(("Pacific",), tuple(data.sectors()), "Off")["investable"]
+    assert len(at.dataframe[0].value) == pacific
     at.text_input(key="uni_search").set_value("bank").run()
     shown = len(at.dataframe[0].value)
-    assert 0 < shown < (data.stocks()["zone"] == "Pacific").sum() and f"{shown} companies" in at.caption[-1].value
+    assert 0 < shown < pacific and f"{shown} companies" in at.caption[-1].value
     assert not at.exception
 
 

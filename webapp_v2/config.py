@@ -83,7 +83,8 @@ THEMES = {  # Streamlit theme options and chart colours of each mode (weight / r
               "weight": "#C9D0DA", "risk": "#1B365D"},
 }
 # clearly different hues so that the lines can be told apart: blue = ours, coral = 60/40, amber = 1/N
-SERIES_COLORS = {"Your portfolio": "#7CC4FF", "ERC": "#7CC4FF", "60/40": "#F08A6C", "1/N": "#F2C66D", "EW": "#9AA5B8", RISK_FREE: "#3D4656"}
+SERIES_COLORS = {"Your portfolio": "#7CC4FF", "ERC": "#7CC4FF", "60/40": "#F08A6C", "1/N": "#F2C66D",
+                 "1/N (equal weights)": "#F2C66D", "EW": "#9AA5B8", RISK_FREE: "#3D4656"}
 PALETTE = ["#7CC4FF", "#4D8FD6", "#9B8CFF", "#5ED3B6", "#F2C66D", "#F08A6C", "#C77DD8", "#8FD694"]
 CHART_TRANSITION_MS = 600
 

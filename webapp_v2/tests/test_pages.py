@@ -89,3 +89,20 @@ def test_next_is_blocked_when_the_esg_screen_leaves_too_few_stocks():
     click_next(at)
     at.select_slider(key="w_esg").set_value(list(cfg.ESG_LEVELS)[-1]).run()
     assert at.button(key="next").disabled and at.warning
+
+
+def test_all_six_steps_are_shown_and_stock_steps_pass_without_equities():
+    """The stepper always shows steps 1-6; without equities, steps 3 and 4 only inform and let the client go on."""
+    at = app()
+    at.switch_page(cfg.PAGES["journey"]).run()
+    assert sum(f"Step {n}" in str(h.value) for h in at.get("html") for n in range(1, 7)) >= 6
+    at.button(key="regions_0").click().run()
+    click_next(at)
+    for cls in data.other_classes():
+        at.button(key=f"classes_{data.asset_classes().index(cls)}").click().run()
+    click_next(at)
+    for step in ("sectors", "esg"):
+        assert at.session_state["step"] == step and not at.button(key="next").disabled
+        click_next(at)
+    click_next(at)
+    assert at.session_state["step"] == "portfolio" and not at.exception

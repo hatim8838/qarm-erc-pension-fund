@@ -1,4 +1,4 @@
-"""Client journey steps 3a-3e: regions, asset classes, sectors, ESG screen, risk level."""
+"""Client journey steps 1-5: regions, asset classes, sectors, ESG screen, risk level."""
 
 import pandas as pd
 import streamlit as st
@@ -40,7 +40,7 @@ def _index_chart(returns: pd.DataFrame, key: str, note: str) -> None:
 
 
 def regions(values: dict) -> None:
-    """3a: regional equity sleeves as clickable cards."""
+    """Step 1: regional equity sleeves as clickable cards."""
     blocks.section(*J["regions"])
     table = data.stocks()
     facts = {}
@@ -55,12 +55,12 @@ def regions(values: dict) -> None:
 
 
 def classes(values: dict) -> None:
-    """3b: asset classes with what they contain, their role and their history."""
+    """Step 2: asset classes with what they contain, their role and their history."""
     blocks.section(*J["classes"])
     facts = {c: content.CLASS_ROLES[c] for c in data.asset_classes()}
     _pick_cards("classes", data.asset_classes(), facts, values["classes"])
     idx = data.index_returns()
-    chosen = values["regions"] or data.regions()  # equities = the regions picked in 3a, equal weights
+    chosen = values["regions"] or data.regions()  # equities = the regions picked in step 1, equal weights
     bonds, commodities = data.other_classes()
     classes_ = pd.DataFrame({
         f"{cfg.EQUITIES} ({', '.join(chosen)})": idx[[cfg.INDEX_LABELS[r] for r in chosen]].mean(axis=1),
@@ -77,8 +77,11 @@ def _save(key: str, widget: str) -> None:
 
 
 def sectors(values: dict) -> None:
-    """3c: sectors applied to every chosen region, with the investable stocks left in each."""
+    """Step 3: sectors applied to every chosen region, with the investable stocks left in each."""
     blocks.section(*J["sectors"])
+    if cfg.EQUITIES not in values["classes"]:
+        st.info(T["no_equities"], icon=":material/info:")
+        return
     st.multiselect(J["sectors"][0], data.sectors(), default=values["sectors"], key="w_sectors",
                    on_change=_save, args=("sectors", "w_sectors"), label_visibility="collapsed")
     sec = tuple(st.session_state["sectors"])
@@ -92,8 +95,11 @@ def esg_label(level: str) -> str:
 
 
 def esg(values: dict) -> None:
-    """3d: ESG screen slider, with the stocks excluded today and the ESG score it buys, live."""
+    """Step 4: ESG screen slider, with the stocks excluded today and the ESG score it buys, live."""
     blocks.section(*J["esg"])
+    if cfg.EQUITIES not in values["classes"]:
+        st.info(T["no_equities"], icon=":material/info:")
+        return
     st.select_slider(T["esg_level"], list(cfg.ESG_LEVELS), value=values["esg"], format_func=esg_label,
                      key="w_esg", on_change=_save, args=("esg", "w_esg"), help=content.ESG_HELP)
     counts = universe.stock_counts(tuple(values["regions"]), tuple(values["sectors"]), values["esg"])
@@ -113,7 +119,7 @@ def level_label(level: int) -> str:
 
 
 def profile_step(values: dict) -> None:
-    """3e: one slider sets α, with the resulting split on one live line."""
+    """Step 5: one slider sets α, with the resulting split on one live line."""
     blocks.section(*J["profile"])
     st.select_slider(T["level_slider"], list(cfg.ALPHAS), value=values["level"], format_func=level_label,
                      key="w_level", on_change=_save, args=("level", "w_level"))
@@ -125,7 +131,7 @@ def profile_step(values: dict) -> None:
 
 
 def _levels_table(choices: portfolio.Choices, chosen: int) -> None:
-    """What each risk level would have meant for the portfolio built in steps 3a-3d (backtest, net of costs):
+    """What each risk level would have meant for the portfolio built in steps 1-4 (backtest, net of costs):
     the information a pension fund's committee needs to choose, instead of a questionnaire."""
     series = {}
     for level in cfg.ALPHAS:
