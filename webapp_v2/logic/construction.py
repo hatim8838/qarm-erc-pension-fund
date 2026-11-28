@@ -1,4 +1,4 @@
-"""Two-level ERC (LN 5) on the LN 3 covariance, with the ESG screen inside the regional sleeves."""
+"""Two-level ERC on the shrunk covariance, with the ESG screen inside the regional sleeves."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from logic.risk import volatility
 
 
 def erc(window: pd.DataFrame, covariance=ledoit_wolf_cc) -> pd.Series:
-    """x_erc on Σ̂ of the window: RC_i = σ(x)/n (LN 5, log-barrier of core); empty when no asset."""
+    """x_erc on Σ̂ of the window: RC_i = σ(x)/n (log-barrier of core); empty when no asset."""
     if window.shape[1] == 0:  # no stock with a complete window yet: the sleeve waits
         return pd.Series(dtype=float)
     return erc_weights(covariance(window))

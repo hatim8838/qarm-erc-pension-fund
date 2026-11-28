@@ -28,14 +28,17 @@ def classes_and_sectors(result: dict, choices) -> None:
 
 @st.fragment
 def performance_tab(result: dict, net: pd.Series, alpha: float) -> None:
-    """The one comparison with a benchmark: your portfolio vs 60/40 or 1/N given the same α (SR, MDD, TE, IR),
-    then gross vs net, turnover and weights over time."""
+    """The one comparison with a benchmark: your portfolio vs 60/40 or 1/N given the same α (value of 100,
+    drawdown, SR, MDD, TE, IR), then gross vs net, turnover and weights over time."""
     benchmark = st.selectbox(T["benchmark"], cfg.COMPOSITE_BENCHMARKS, key="benchmark")  # 60/40 and 1/N
     mine = net.rename("Your portfolio")
     bench = performance.with_alpha(data.benchmarks()[benchmark], alpha, data.risk_free_daily()).rename(benchmark)
     both = pd.concat([mine, bench], axis=1)
     blocks.section(T["bench_title"].format(b=benchmark, rf=blocks.pct(1 - alpha, 0)) if alpha < 1 else benchmark)
     charts.lines(performance.wealth(both), log_y=True, key="perf_wealth")
+    blocks.section(T["drawdown_title"].format(b=benchmark))
+    charts.lines(performance.drawdown(both), percent_y=True, height=300, key="perf_drawdown")
+    st.caption(T["drawdown_note"])
     table = performance.metrics_table(both)[["ann_return", "ann_volatility", "sharpe", "max_drawdown"]]
     # tracking error and IR compare a portfolio with the benchmark: empty on the benchmark row itself
     for col in ("tracking_error", "information_ratio"):

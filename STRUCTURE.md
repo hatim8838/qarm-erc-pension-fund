@@ -23,7 +23,7 @@ qarm-erc-pension-fund/
 │   ├── ui/                      # charts, tables, page blocks, dark / light theme
 │   ├── scripts/precompute.py    # writes precomputed/
 │   ├── precomputed/             # stored results, used only while they match the code and the data
-│   └── tests/                   # course examples, stock counts, pages, precomputed results
+│   └── tests/                   # small known examples, stock counts, pages, precomputed results
 ├── requirements.txt
 └── README.md
 ```
@@ -60,7 +60,7 @@ start on 01/01/2004: one estimation window before the first rebalancing on 01/01
   (three GSCI sectors).
 - Two-level ERC: ERC within each sleeve, then ERC across the sleeves the client holds.
 - Monthly rebalancing; covariance estimated on the past 252 business days only, with Ledoit-Wolf shrinkage
-  (LN 3); weights held from the next day and drifting with returns.
+  towards constant correlation; weights held from the next day and drifting with returns.
 - A stock is investable at a rebalancing date only if it has a return on every day of the window and at most
   20% zero returns (more means stale prices). Today: 1,108 stocks listed, 1,093 investable.
 - ESG screen: the worst-rated 10%, 30% or 50% of the investable stocks of each region are excluded before ERC runs.

@@ -200,6 +200,8 @@ TEXT = {
     "weights_time": "Weights at each monthly rebalancing", "expected": "Expected annual return",
     "expected_vol": "Expected volatility",
     "bench_title": "{b} with the same cash share ({rf})",
+    "drawdown_title": "Drawdown: your portfolio vs {b}",
+    "drawdown_note": "Fall from the previous peak. The deeper and longer the dip, the more the fund's reserves are used.",
     "bench_note": "The benchmark holds the same {rf} in the risk-free asset as your portfolio. 60/40: 60% S&P 500 "
                   "and 40% US bonds (AGG). 1/N: equal weights on the six sleeve indices. Both rebalanced monthly.",
     "ci_note": "± {margin} is the 95% confidence interval of the average return, estimated over {years:.0f} years "

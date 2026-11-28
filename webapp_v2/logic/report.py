@@ -1,4 +1,4 @@
-"""Breakdowns of the client portfolio today, and the LN 5 comparison of EW, ERC and MV."""
+"""Breakdowns of the client portfolio today, and the comparison of EW, ERC and MV."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def by_sector(result: dict) -> pd.Series:
 
 
 def compare_ew_erc_mv(cov: pd.DataFrame, x_erc: pd.Series) -> pd.DataFrame:
-    """LN 5: σ and RC*_i of EW, ERC and MV on the same Σ̂ (σ(x_mv) ≤ σ(x_erc) ≤ σ(x_ew))."""
+    """σ and RC*_i of EW, ERC and MV on the same Σ̂ (σ(x_mv) ≤ σ(x_erc) ≤ σ(x_ew))."""
     portfolios = {"MV": min_variance(cov), "ERC": x_erc, "EW": pd.Series(1 / len(cov), index=cov.index)}
     rows = {}
     for name, x in portfolios.items():

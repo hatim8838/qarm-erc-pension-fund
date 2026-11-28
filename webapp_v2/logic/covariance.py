@@ -1,4 +1,4 @@
-"""LN 3: Ledoit-Wolf shrinkage towards the constant-correlation target, Σ̂ = δF + (1−δ)S."""
+"""Ledoit-Wolf shrinkage towards the constant-correlation target, Σ̂ = δF + (1−δ)S."""
 
 from __future__ import annotations
 

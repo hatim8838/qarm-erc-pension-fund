@@ -87,10 +87,10 @@ def test_portfolio_tabs_and_total_money_toggle():
     assert cfg.RISK_FREE in sleeves.index and sleeves.iloc[:, 1].sum() == pytest.approx(100)
 
 
-def test_no_course_mention_and_no_implementation_page_left():
-    """No "LN x" or "lecture" in the site's code and text, and nothing points to the deleted page."""
+def test_no_lecture_reference_and_no_implementation_page_left():
+    """No lecture reference in the site's code and text, and nothing points to the deleted page."""
     for path in SITE_TEXT:
         text = path.read_text(encoding="utf-8")
-        assert not re.search(r"\bLN \d|lecture", text), path.name
+        assert not re.search(r"\bLN ?\d|lecture", text), path.name
         assert "implementation" not in text.lower(), path.name
     assert not (cfg.APP_DIR / "pages" / "implementation.py").exists()

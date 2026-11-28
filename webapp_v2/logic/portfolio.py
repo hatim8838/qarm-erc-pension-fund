@@ -78,7 +78,7 @@ def erc_part(regions: tuple, classes: tuple, sectors: tuple, esg: str, covarianc
 
 
 def build(choices: Choices, covariance=ledoit_wolf_cc) -> dict:
-    """Backtest of y = α·x_erc + (1 − α)·r, rebalanced monthly back to α (LN 2), with every decision."""
+    """Backtest of y = α·x_erc + (1 − α)·r, rebalanced monthly back to α, with every decision."""
     return mix(erc_part(choices.regions, choices.classes, choices.sectors, choices.esg, covariance), choices)
 
 
@@ -138,7 +138,7 @@ def total_turnover(result: dict) -> pd.Series:
 
 
 def net_returns(result: dict, cost_bps: float) -> pd.Series:
-    """LN 3: returns net of costs c·Σ|Δx| = c·2·turnover, paid on the first day after each rebalancing."""
+    """Returns net of costs c·Σ|Δx| = c·2·turnover, paid on the first day after each rebalancing."""
     r = result["returns"].copy()
     for t, turnover in result["total_turnover"].items():
         after = r.index[r.index > t]

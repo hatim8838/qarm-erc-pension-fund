@@ -1,4 +1,4 @@
-"""LN 5 risk analytics in course notation: σ(x), MR, RC, RC*, minimum variance."""
+"""Risk analytics: σ(x), MR, RC, RC*, minimum variance."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ def volatility(x: pd.Series, cov: pd.DataFrame) -> float:
 
 
 def decomposition(x: pd.Series, cov: pd.DataFrame) -> pd.DataFrame:
-    """LN 5 table: x_i, MR_i = (Σx)_i/σ(x), RC_i = x_i·MR_i, RC*_i = RC_i/σ(x) (Euler: ΣRC_i = σ(x))."""
+    """Risk table: x_i, MR_i = (Σx)_i/σ(x), RC_i = x_i·MR_i, RC*_i = RC_i/σ(x) (Euler: ΣRC_i = σ(x))."""
     w = x.reindex(cov.index).fillna(0.0)
     sigma = volatility(w, cov)
     mr = (cov.to_numpy() @ w.to_numpy()) / sigma

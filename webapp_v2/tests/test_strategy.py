@@ -34,7 +34,7 @@ def test_baseline_reproduces_core_erc_with_core_estimator():
 
 
 def test_baseline_with_ln3_shrinkage_stays_close_to_core(built):
-    """LN 3 constant-correlation target instead of core's identity target: same strategy, small gap."""
+    """Constant-correlation target instead of core's identity target: same strategy, small gap."""
     both = pd.concat([built["baseline"]["returns"], data.portfolio_returns()[cfg.CORE_ERC]], axis=1).dropna()
     assert both.corr().iloc[0, 1] > 0.99
     years = len(both) / cfg.TRADING_DAYS

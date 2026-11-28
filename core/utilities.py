@@ -33,7 +33,7 @@ def simple_returns(prices: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Series
 
 
 # --------------------------------------------------------------------------- #
-# Risk budgeting (LN5)
+# Risk budgeting
 # --------------------------------------------------------------------------- #
 LEDOIT_WOLF_MIN_ASSETS = 30  # Ledoit-Wolf shrinkage for sleeves with at least 30 assets
 
@@ -63,7 +63,7 @@ def risk_contributions(weights: pd.Series, cov: pd.DataFrame, relative: bool = T
 def risk_budget_weights(cov: pd.DataFrame, budgets: pd.Series | None = None) -> pd.Series:
     """Long-only weights summing to 1 with relative risk contributions = budgets.
 
-    Same problem as in LN5, ``min 1/2 y' Sigma y`` s.t. ``sum b_i ln y_i >= c``
+    Risk-budgeting problem ``min 1/2 y' Sigma y`` s.t. ``sum b_i ln y_i >= c``
     then ``w = y / sum(y)``, solved in its equivalent form
     ``min 1/2 y' Sigma y - sum b_i ln y_i`` (fast for hundreds of stocks).
     ``budgets=None`` gives the ERC portfolio (``b_i = 1/N``).

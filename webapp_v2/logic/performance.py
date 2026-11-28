@@ -1,4 +1,4 @@
-"""LN 2 performance (SR, TE, IR) and wealth paths, reusing core's metrics."""
+"""Performance (SR, TE, IR) and wealth paths, reusing core's metrics."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def aligned(returns: pd.DataFrame) -> pd.DataFrame:
 
 
 def with_alpha(returns: pd.Series, alpha: float, rf: pd.Series) -> pd.Series:
-    """α in the series and 1 − α in the risk-free asset (LN2), the client's own mix applied to a benchmark."""
+    """α in the series and 1 − α in the risk-free asset, the client's own mix applied to a benchmark."""
     return alpha * returns + (1 - alpha) * rf.reindex(returns.index).fillna(0.0)
 
 
@@ -38,3 +38,9 @@ def relative(portfolio: pd.Series, benchmark: pd.Series) -> dict[str, float]:
 def wealth(returns: pd.DataFrame) -> pd.DataFrame:
     """Value of 100 invested at the common start."""
     return 100 * (1 + aligned(returns)).cumprod()
+
+
+def drawdown(returns: pd.DataFrame) -> pd.DataFrame:
+    """Fall from the previous peak of the value of 100 (0 at a new peak)."""
+    w = wealth(returns)
+    return w / w.cummax() - 1

@@ -1,4 +1,4 @@
-"""Expected return with its estimation error (LN 3) and a log-normal projection (LN 6)."""
+"""Expected return with its estimation error and a log-normal projection."""
 
 from __future__ import annotations
 
